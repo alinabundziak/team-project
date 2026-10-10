@@ -4,9 +4,9 @@
   "description": "**Дата:** 06.10.2026",
   "main": "index.js",
   "scripts": {
-  "start": "node src/server.js",
-  "dev": "node --watch src/server.js"
-},
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alinabundziak/team-project.git"
@@ -20,6 +20,10 @@
   },
   "homepage": "https://github.com/alinabundziak/team-project#readme",
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }
