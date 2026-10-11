@@ -18,6 +18,11 @@ app.get("/health", (req, res) => {
 
 app.use("/children", childrenRoutes);
 
+const userRoutes = require('./modules/users/users.routes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);             
+
 app.use(errorHandler);
 
 module.exports = app;

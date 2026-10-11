@@ -21,4 +21,7 @@ function create({ email, passwordHash, roleId }) {
   });
 }
 
-module.exports = { findByEmail, findById, findRoleByName, create };
+function findAnyByRole(roleName) {
+  return prisma.users.findFirst({ where: { roles: { name: roleName } } });
+}
+module.exports = { findByEmail, findById, findRoleByName, findAnyByRole, create };

@@ -8,9 +8,4 @@ const router = express.Router();
 
 router.post('/login', asyncHandler(controller.login));
 
-router.get('/test/any', authenticate, (req, res) => res.json({ user: req.user }));
-router.get('/test/admin', authenticate, authorizeRoles('ADMIN'), (req, res) =>
-  res.json({ message: 'Привіт, адмін', user: req.user })
-);
-
 module.exports = router;

@@ -5,7 +5,6 @@ const { hashPassword } = require('../../utils/password');
 const ROLES = ['ADMIN', 'MANAGER', 'TEACHER', 'PARENT'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Єдиний формат користувача назовні: БЕЗ password_hash
 function toPublicUser(user) {
   return {
     id: user.id,
@@ -47,7 +46,6 @@ async function createUser({ email, password, role }) {
     });
     return toPublicUser(user);
   } catch (err) {
-    // два однакових запити одночасно: перевірку вище обійшли, але UNIQUE у БД спрацював
     if (err.code === 'P2002') {
       throw new AppError(409, 'Користувач з таким email уже існує');
     }
@@ -55,4 +53,12 @@ async function createUser({ email, password, role }) {
   }
 }
 
-module.exports = { createUser, toPublicUser, ROLES };
+async function getMe(userId) {
+  const user = await repo.findById(userId);
+  if (!user) {
+    throw new AppError(404, 'Користувача не знайдено');
+  }
+  return toPublicUser(user);
+}
+
+module.exports = { createUser, getMe, toPublicUser, ROLES };
