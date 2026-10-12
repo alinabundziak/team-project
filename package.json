@@ -1,27 +1,21 @@
 {
-  "name": "team-project",
+  "name": "kindergarten-backend",
   "version": "1.0.0",
-  "description": "**Дата:** 06.10.2026",
-  "main": "index.js",
+  "private": true,
+  "description": "Backend starter for Kindergarten Management System using Node.js, Prisma, and Supabase PostgreSQL",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "db:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "db:push": "prisma db push",
+    "db:validate": "prisma validate",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/alinabundziak/team-project.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/alinabundziak/team-project/issues"
-  },
-  "homepage": "https://github.com/alinabundziak/team-project#readme",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "express": "^5.2.1"
+    "@prisma/client": "5.22.0"
   },
   "devDependencies": {
     "prisma": "^5.22.0"
@@ -30,5 +24,10 @@
     "@prisma/client@5.22.0": true,
     "@prisma/engines@5.22.0": true,
     "prisma@5.22.0": true
+  "engines": {
+    "node": ">=18.18"
+  },
+  "prisma": {
+    "seed": "node prisma/users.js"
   }
 }
