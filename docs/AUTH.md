@@ -79,6 +79,35 @@
 Колекція в `docs/postman/`. Спочатку виконай логін кожної ролі, токени збережуться в змінні.
 
 
+## Етап B: Children, Parents, зв'язок дитина-батько
+
+Усі маршрути під префіксом `/api`, потрібен токен. Помилки у форматі `{ error: { status, message } }`.
+
+| Маршрут | Ролі | Примітка |
+|---|---|---|
+| `GET /children` | ADMIN, MANAGER | пагінація `page`, `limit`, фільтри `groupId`, `search` |
+| `POST /children` | ADMIN, MANAGER | `firstName`, `lastName`, `dateOfBirth` (YYYY-MM-DD), `groupId` (необов'язково) |
+| `GET /children/:id` | ADMIN, MANAGER, PARENT | Parent бачить лише свою дитину, чужа або неіснуюча дає 404 |
+| `PATCH /children/:id` | ADMIN, MANAGER | `groupId: null` виводить дитину з групи |
+| `DELETE /children/:id` | ADMIN | 409, якщо є підписки/нарахування |
+| `GET /parents`, `GET /parents/:id` | ADMIN, MANAGER | пошук `search` за ім'ям, прізвищем, телефоном |
+| `POST /parents` | ADMIN, MANAGER | `userId` (User з роллю PARENT), `firstName`, `lastName`, `phone` |
+| `PATCH /parents/:id` | ADMIN, MANAGER | `userId` змінювати не можна |
+| `DELETE /parents/:id` | ADMIN | 409, якщо до батька прив'язані діти |
+| `POST /children/:id/parents` | ADMIN, MANAGER | body `{ "parentId" }`, дубль або другий батько дає 409 |
+| `DELETE /children/:id/parents/:parentId` | ADMIN, MANAGER | 404, якщо зв'язку немає |
+| `GET /parents/me/children` | PARENT | власні діти |
+
+**Контракт Child:** `id`, `firstName`, `lastName`, `dateOfBirth`, `age`, `groupId`, `parentIds` (масив).
+**Контракт Parent:** `id`, `userId`, `email`, `firstName`, `lastName`, `phone` (нормалізований, напр. `+380501234567`).
+
+**Правила:**
+- Вік дитини від 2 до 5 повних років на сьогодні (правило віку ще не погоджене, налаштовується в `src/config/childrenRules.js`).
+- Профіль батька створюється для User з роллю PARENT, зв'язок 1:1.
+- Зараз підтримується один батько на дитину (поле `children.parent_id`). Для кількох батьків потрібна таблиця `child_parents`, її треба погодити з координатором БД.
+- Видалення батька або дитини з пов'язаними записами відхиляється з 409, бо в схемі стоїть `onDelete: Cascade`.
+- Перевірку власності дитини для Parent робить `assertChildAccess(req.user, childId)` з `children/children.access.js`.
+
 ## Доступ Parent до даних дитини
 
 Parent бачить лише власних дітей (child.parent_id = id профілю батька).
