@@ -27,6 +27,8 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/api/_examples', require('./modules/auth/auth.examples.routes'));
 }
 
+app.use('/api/children', require('./modules/children/children.routes'));
+
 app.use(errorHandler);
 
 module.exports = app;
