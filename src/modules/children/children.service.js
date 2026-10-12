@@ -15,6 +15,7 @@ function toChildDto(child) {
     dateOfBirth: formatDateOnly(child.birth_date),
     age: calculateAge(child.birth_date),
     groupId: child.group_id,
+    parentIds: child.parent_id ? [child.parent_id] : [],
   };
 }
 
