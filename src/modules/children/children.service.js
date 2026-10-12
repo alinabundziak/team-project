@@ -5,6 +5,7 @@ const { parseDateOnly, todayUtc, calculateAge, formatDateOnly } = require('../..
 const rules = require('../../config/childrenRules');
 const { validateName } = require('../../utils/validators');
 const { parsePagination } = require('../../utils/pagination');
+const { assertChildAccess, getOwnParentId } = require('./children.access');
 
 // Єдиний формат дитини назовні (контракт для Dev 2 і Dev 4)
 function toChildDto(child) {
@@ -78,10 +79,26 @@ async function listChildren(query = {}) {
   return { data: items.map(toChildDto), meta: { page, limit, total } };
 }
 
-async function getChild(rawId) {
+async function listMyChildren(user, query = {}) {
+  const parentId = await getOwnParentId(user.id);
+  if (parentId === null) {
+    throw new AppError(404, 'Профіль батька не знайдено');
+  }
+
+  const { page, limit } = parsePagination(query);
+  const where = { parent_id: parentId };
+
+  const [items, total] = await Promise.all([
+    repo.findMany({ where, skip: (page - 1) * limit, take: limit }),
+    repo.count(where),
+  ]);
+
+  return { data: items.map(toChildDto), meta: { page, limit, total } };
+}
+
+async function getChild(rawId, user) {
   const id = parseId(rawId);
-  const child = await repo.findById(id);
-  if (!child) throw new AppError(404, 'Дитину не знайдено');
+  const child = await assertChildAccess(user, id);
   return toChildDto(child);
 }
 
@@ -141,4 +158,4 @@ async function deleteChild(rawId) {
   }
 }
 
-module.exports = { listChildren, getChild, createChild, updateChild, deleteChild, toChildDto };
+module.exports = { listChildren, listMyChildren, getChild, createChild, updateChild, deleteChild, toChildDto };

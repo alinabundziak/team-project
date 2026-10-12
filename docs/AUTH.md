@@ -66,6 +66,7 @@
 | teacher.test@example.com | TEACHER |
 | parent1.test@example.com | PARENT |
 | parent2.test@example.com | PARENT |
+| parent3.test@example.com | PARENT |
 
 ## Живі приклади
 Після запуску сервера (не production):
@@ -76,3 +77,32 @@
 
 ## Postman
 Колекція в `docs/postman/`. Спочатку виконай логін кожної ролі, токени збережуться в змінні.
+
+
+## Доступ Parent до даних дитини
+
+Parent бачить лише власних дітей (child.parent_id = id профілю батька).
+Чужа дитина і неіснуюча повертають однакову відповідь: **404** «Дитину не знайдено».
+
+Для будь-якого маршруту, що працює з даними конкретної дитини
+(група дитини, підписки, платежі, пільги), використовуй готову перевірку:
+
+    const { assertChildAccess } = require('../children/children.access');
+
+    // дозволь роль PARENT на маршруті і перевір власність у сервісі:
+    router.get('/children/:id/payments',
+      authenticate,
+      authorizeRoles(ROLES.ADMIN, ROLES.PARENT),
+      asyncHandler(controller.listForChild));
+
+    // у сервісі, ДО читання даних:
+    const child = await assertChildAccess(req.user, childId);
+
+`assertChildAccess` повертає запис дитини (поля БД) або кидає AppError 404.
+Групу, підписки та платежі дитини Parent зможе побачити лише тоді, коли Dev 2 і Dev 4 викличуть assertChildAccess у своїх маршрутах.
+ADMIN і MANAGER проходять завжди, PARENT лише для своїх дітей, решта ролей ніколи.
+Менеджеру фінанси закриваються окремо через `authorizeRoles(ROLES.ADMIN)`.
+
+Нові маршрути:
+- `GET /api/parents/me/children`: тільки PARENT, його діти (пагінація page/limit)
+- `GET /api/children/:id`: ADMIN, MANAGER, PARENT (тільки своя дитина)

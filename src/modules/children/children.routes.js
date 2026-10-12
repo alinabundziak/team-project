@@ -4,17 +4,18 @@ const asyncHandler = require('../../utils/asyncHandler');
 const authenticate = require('../../middleware/authenticate');
 const authorizeRoles = require('../../middleware/authorizeRoles');
 const { ROLES } = require('../../config/roles');
-const childParents = require('./childParents.controller');
+const childParents = require('../childParents/childParents.controller');
 
 const router = express.Router();
 
 router.use(authenticate);
 
 const staff = authorizeRoles(ROLES.ADMIN, ROLES.MANAGER);
+const staffOrParent = authorizeRoles(ROLES.ADMIN, ROLES.MANAGER, ROLES.PARENT);
 
 router.get('/', staff, asyncHandler(controller.list));
 router.post('/', staff, asyncHandler(controller.create));
-router.get('/:id', staff, asyncHandler(controller.getOne));
+router.get('/:id', staffOrParent, asyncHandler(controller.getOne));
 router.patch('/:id', staff, asyncHandler(controller.update));
 router.delete('/:id', staff, asyncHandler(controller.remove));
 router.post('/:id/parents', staff, asyncHandler(childParents.link));

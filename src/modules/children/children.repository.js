@@ -37,6 +37,10 @@ function countSubscriptions(childId) {
   return prisma.subscriptions.count({ where: { child_id: childId } });
 }
 
+function findParentByUserId(userId) {
+  return prisma.parents.findUnique({ where: { user_id: userId } });
+}
+
 module.exports = {
   findMany,
   count,
@@ -46,4 +50,5 @@ module.exports = {
   remove,
   findGroupById,
   countSubscriptions,
+  findParentByUserId,
 };

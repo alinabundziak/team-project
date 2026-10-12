@@ -5,7 +5,11 @@ async function list(req, res) {
 }
 
 async function getOne(req, res) {
-  res.status(200).json(await service.getChild(req.params.id));
+  res.status(200).json(await service.getChild(req.params.id, req.user));
+}
+
+async function listMine(req, res) {
+  res.status(200).json(await service.listMyChildren(req.user, req.query));
 }
 
 async function create(req, res) {
@@ -21,4 +25,4 @@ async function remove(req, res) {
   res.status(204).send();
 }
 
-module.exports = { list, getOne, create, update, remove };
+module.exports = { list, getOne, create, update, remove, listMine };
