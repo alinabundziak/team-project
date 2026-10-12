@@ -12,7 +12,8 @@
     "db:validate": "prisma validate",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "create-admin": "node scripts/create-admin.js"
+    "create-admin": "node scripts/create-admin.js",
+    "seed-test-users": "node scripts/seed-test-users.js"
   },
   "repository": {
     "type": "git",

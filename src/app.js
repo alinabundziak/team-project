@@ -23,6 +23,10 @@ const userRoutes = require('./modules/users/users.routes');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);             
 
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/_examples', require('./modules/auth/auth.examples.routes'));
+}
+
 app.use(errorHandler);
 
 module.exports = app;

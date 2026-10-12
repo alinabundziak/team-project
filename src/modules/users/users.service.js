@@ -2,7 +2,7 @@ const repo = require('./users.repository');
 const AppError = require('../../utils/AppError');
 const { hashPassword } = require('../../utils/password');
 
-const ROLES = ['ADMIN', 'MANAGER', 'TEACHER', 'PARENT'];
+const { ROLE_LIST } = require('../../config/roles');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toPublicUser(user) {
@@ -21,8 +21,8 @@ async function createUser({ email, password, role }) {
   if (typeof password !== 'string' || password.length < 8 || password.length > 72) {
     throw new AppError(400, 'Пароль має містити від 8 до 72 символів');
   }
-  if (!ROLES.includes(role)) {
-    throw new AppError(400, `Роль має бути однією з: ${ROLES.join(', ')}`);
+  if (!ROLE_LIST.includes(role)) {
+    throw new AppError(400, `Роль має бути однією з: ${ROLE_LIST.join(', ')}`);
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -61,4 +61,4 @@ async function getMe(userId) {
   return toPublicUser(user);
 }
 
-module.exports = { createUser, getMe, toPublicUser, ROLES };
+module.exports = { createUser, getMe, toPublicUser };
