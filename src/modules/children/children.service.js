@@ -3,8 +3,8 @@ const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
 const { parseDateOnly, todayUtc, calculateAge, formatDateOnly } = require('../../utils/age');
 const rules = require('../../config/childrenRules');
-
-const NAME_RE = /^\p{L}[\p{L}\s'’ʼ-]*$/u;
+const { validateName } = require('../../utils/validators');
+const { parsePagination } = require('../../utils/pagination');
 
 // Єдиний формат дитини назовні (контракт для Dev 2 і Dev 4)
 function toChildDto(child) {
@@ -16,17 +16,6 @@ function toChildDto(child) {
     age: calculateAge(child.birth_date),
     groupId: child.group_id,
   };
-}
-
-function validateName(value, label) {
-  if (typeof value !== 'string') {
-    throw new AppError(400, `${label} є обов'язковим`);
-  }
-  const v = value.trim();
-  if (!v || v.length > rules.MAX_NAME_LENGTH || !NAME_RE.test(v)) {
-    throw new AppError(400, `Некоректне поле: ${label}`);
-  }
-  return v;
 }
 
 function validateBirthDate(value) {
@@ -60,16 +49,8 @@ async function resolveGroupId(value) {
   return value;
 }
 
-function parseQueryInt(value, defaultValue, name, max) {
-  if (value === undefined) return defaultValue;
-  const n = parseId(value, name);
-  if (n > max) throw new AppError(400, `${name} не може бути більше ${max}`);
-  return n;
-}
-
 async function listChildren(query = {}) {
-  const page = parseQueryInt(query.page, 1, 'page', 100000);
-  const limit = parseQueryInt(query.limit, 20, 'limit', 100);
+  const { page, limit } = parsePagination(query);
 
   const where = {};
   if (query.groupId !== undefined) {

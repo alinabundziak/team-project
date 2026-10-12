@@ -29,6 +29,8 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use('/api/children', require('./modules/children/children.routes'));
 
+app.use('/api/parents', require('./modules/parents/parents.routes'));
+
 app.use(errorHandler);
 
 module.exports = app;
