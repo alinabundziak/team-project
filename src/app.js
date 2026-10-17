@@ -4,6 +4,8 @@ const roomsRoutes = require("./modules/rooms/rooms.routes");
 const staffRoutes = require("./modules/employees/staff.routes");
 const groupsRoutes = require("./modules/groups/groups.routes");
 
+const payrollRoutes = require("./modules/payroll/payroll.routes");
+
 const app = express();
 
 app.use(express.json());
@@ -21,5 +23,6 @@ app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
 
 app.use("/api/groups", groupsRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 module.exports = app;
