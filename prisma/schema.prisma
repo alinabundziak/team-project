@@ -195,3 +195,9 @@ model tariffs {
 
   @@unique([code, valid_from])
 }
+
+model meal_rates {
+  id         Int     @id @default(autoincrement())
+  age        Int     @unique
+  daily_rate Decimal @db.Decimal(10, 2)
+}

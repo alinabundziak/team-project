@@ -9,7 +9,7 @@ const { calculateTuition } = require('./tuition.calculator');
 const pricingRepo = require('./pricing.repository');
 const { calculateAge } = require('../../utils/age');
 const { getTariffAmount } = require('../tariffs/tariffs.service');
-const { mealPricePerDay, mealPriceForDays } = require('./meal.calculator');
+const { mealPriceForDays } = require('./meal.calculator');
 
 const Decimal = Prisma.Decimal;
 const PERIODS = ['MONTHLY', 'ANNUAL'];
@@ -78,26 +78,19 @@ function parseDays(value) {
 }
 
 async function calculateMealAmount(age, days) {
-  if (age < cfg.MEAL_MIN_AGE || age > cfg.MEAL_MAX_AGE) {
-    throw new AppError(409, `Вік дитини (${age}) поза діапазоном харчування ${cfg.MEAL_MIN_AGE}-${cfg.MEAL_MAX_AGE}. Для нарахування без харчування вкажіть mealDays: 0`);
+  const rate = await pricingRepo.findMealRateByAge(age);
+  if (!rate) {
+    throw new AppError(409, `У meal_rates немає ціни для віку ${age}. Для нарахування без харчування вкажіть mealDays: 0`);
   }
 
-  const pricePerDay = mealPricePerDay(age);
+  const billedDays = days === undefined ? cfg.MEAL_DAYS_PER_MONTH : days;
+  const pricePerDay = new Decimal(rate.daily_rate).toDecimalPlaces(2);
 
-  if (days === undefined) {
-    const plan = await pricingRepo.findMealPlanByAge(age);
-    if (!plan) {
-      throw new AppError(409, `У meal_plans немає ціни для віку ${age}. Запусти scripts/seed-meal-plans.js`);
-    }
-    return {
-      pricePerDay,
-      days: cfg.MEAL_DAYS_PER_MONTH,
-      total: new Decimal(plan.monthly_price).toDecimalPlaces(2),
-      source: 'MONTHLY_PLAN',
-    };
-  }
-
-  return { pricePerDay, days, total: mealPriceForDays(age, days), source: 'DAILY_FORMULA' };
+  return {
+    pricePerDay,
+    days: billedDays,
+    total: mealPriceForDays(pricePerDay, billedDays),
+  };
 }
 
 async function getChildDiscountPercent(child) {
@@ -124,7 +117,6 @@ async function estimateMeals(rawChildId, query = {}) {
     age,
     pricePerDay: meal.pricePerDay.toFixed(2),
     days: meal.days,
-    source: meal.source,
     total: meal.total.toFixed(2),
   };
 }

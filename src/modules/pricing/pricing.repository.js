@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
-function findMealPlanByAge(age) {
-  return prisma.meal_plans.findFirst({ where: { age_category: age } });
+function findMealRateByAge(age) {
+  return prisma.meal_rates.findUnique({ where: { age } });
 }
 
-module.exports = { findMealPlanByAge };
+module.exports = { findMealRateByAge };
