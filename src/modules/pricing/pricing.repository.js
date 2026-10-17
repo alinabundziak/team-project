@@ -1,7 +1,10 @@
 const prisma = require('../../config/prisma');
 
-function findMealRateByAge(age) {
-  return prisma.meal_rates.findUnique({ where: { age } });
+function findMealRateEffective(age, date) {
+  return prisma.meal_rates.findFirst({
+    where: { age, valid_from: { lte: date } },
+    orderBy: { valid_from: 'desc' },
+  });
 }
 
-module.exports = { findMealRateByAge };
+module.exports = { findMealRateEffective };

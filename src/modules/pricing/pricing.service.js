@@ -10,6 +10,7 @@ const pricingRepo = require('./pricing.repository');
 const { calculateAge } = require('../../utils/age');
 const { getTariffAmount } = require('../tariffs/tariffs.service');
 const { mealPriceForDays } = require('./meal.calculator');
+const { calculateAge, todayUtc, startOfMonthUtc, formatDateOnly } = require('../../utils/age');
 
 const Decimal = Prisma.Decimal;
 const PERIODS = ['MONTHLY', 'ANNUAL'];
@@ -77,10 +78,13 @@ function parseDays(value) {
   return n;
 }
 
-async function calculateMealAmount(age, days) {
-  const rate = await pricingRepo.findMealRateByAge(age);
+async function calculateMealAmount(age, days, periodStart) {
+  const rate = await pricingRepo.findMealRateEffective(age, periodStart);
   if (!rate) {
-    throw new AppError(409, `У meal_rates немає ціни для віку ${age}. Для нарахування без харчування вкажіть mealDays: 0`);
+    throw new AppError(
+      409,
+      `Немає чинної ціни харчування для віку ${age} на ${formatDateOnly(periodStart)}. Для нарахування без харчування вкажіть mealDays: 0`
+    );
   }
 
   const billedDays = days === undefined ? cfg.MEAL_DAYS_PER_MONTH : days;
@@ -110,7 +114,7 @@ async function estimateMeals(rawChildId, query = {}) {
   if (!child) throw new AppError(404, 'Дитину не знайдено');
 
   const age = calculateAge(child.birth_date);
-  const meal = await calculateMealAmount(age, days);
+  const meal = await calculateMealAmount(age, days, startOfMonthUtc(todayUtc()));
 
   return {
     childId,

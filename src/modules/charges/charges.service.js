@@ -73,7 +73,7 @@ async function createCharge(rawChildId, input) {
   let billedDays = 0;
   if (mealDays !== 0) {
     const age = calculateAge(child.birth_date, periodStart);
-    const meal = await pricing.calculateMealAmount(age, mealDays);
+    const meal = await pricing.calculateMealAmount(age, mealDays, periodStart);
     mealPricePerDay = meal.pricePerDay;
     mealAmount = meal.total;
     billedDays = meal.days;

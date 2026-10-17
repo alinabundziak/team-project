@@ -198,9 +198,12 @@ model tariffs {
 }
 
 model meal_rates {
-  id         Int     @id @default(autoincrement())
-  age        Int     @unique
-  daily_rate Decimal @db.Decimal(10, 2)
+  id         Int      @id @default(autoincrement())
+  age        Int
+  daily_rate Decimal  @db.Decimal(10, 2)
+  valid_from DateTime @db.Date
+
+  @@unique([age, valid_from])
 }
 
 model adjustments {
