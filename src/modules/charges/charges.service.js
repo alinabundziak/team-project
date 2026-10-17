@@ -13,6 +13,7 @@ const paymentsRepo = require('../payments/payments.repository');
 const refundsRepo = require('../refunds/refunds.repository');
 const Decimal = Prisma.Decimal;
 const { getTariffAmount } = require('../tariffs/tariffs.service');
+const adjustmentsRepo = require('../adjustments/adjustments.repository');
 
 function parseMonth(value) {
   const m = typeof value === 'string' ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value.trim()) : null;
@@ -116,13 +117,20 @@ async function listCharges(rawChildId, query = {}) {
 async function getBalance(rawChildId) {
   const child = await requireChild(rawChildId);
 
-  const [charged, paid, refunded] = await Promise.all([
+  const [charged, paid, refunded, adjustments] = await Promise.all([
     repo.sumTotalByChild(child.id),
     paymentsRepo.sumByChild(child.id),
     refundsRepo.sumByChild(child.id),
+    adjustmentsRepo.sumByChild(child.id),
   ]);
 
-  const result = calculateDebt({ charged, paid, refunded });
+  const result = calculateDebt({
+    charged,
+    adjustmentsIncrease: adjustments.increase,
+    adjustmentsDecrease: adjustments.decrease,
+    paid,
+    refunded,
+  });
 
   return { childId: child.id, ...result };
 }
@@ -130,10 +138,11 @@ async function getBalance(rawChildId) {
 async function getFinancialHistory(rawChildId) {
   const child = await requireChild(rawChildId);
 
-  const [charges, payments, refunds] = await Promise.all([
+  const [charges, payments, refunds, adjustments] = await Promise.all([
     repo.findMany({ where: { child_id: child.id } }),
     paymentsRepo.findManyByChild(child.id),
     refundsRepo.findManyByChild(child.id),
+    adjustmentsRepo.findManyByChild(child.id),
   ]);
 
   const events = [
@@ -167,6 +176,18 @@ async function getFinancialHistory(rawChildId) {
       date: r.created_at,
       amount: r.amount.toFixed(2),
       details: { paymentId: r.payment_id, reason: r.reason },
+    })),
+    ...adjustments.map((a) => ({
+      type: 'ADJUSTMENT',
+      id: a.id,
+      date: a.created_at,
+      amount: a.amount.toFixed(2),
+      details: {
+        chargeId: a.charge_id,
+        direction: a.direction,
+        reason: a.reason,
+        createdBy: a.created_by,
+      },
     })),
   ];
 

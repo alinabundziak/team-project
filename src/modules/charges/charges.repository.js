@@ -25,4 +25,8 @@ async function sumTotalByChild(childId) {
   return res._sum.total_amount ?? 0;
 }
 
-module.exports = { create, findMany, count, sumTotalByChild };
+function findById(id) {
+  return prisma.charges.findUnique({ where: { id } });
+}
+
+module.exports = { create, findById, findMany, count, sumTotalByChild };

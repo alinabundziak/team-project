@@ -21,6 +21,7 @@ model users {
   employees     employees?
   parents       parents?
   roles         roles?     @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  adjustments   adjustments[]
 }
 
 model employees {
@@ -164,7 +165,7 @@ model charges {
   total_amount       Decimal  @db.Decimal(10, 2)
   created_at         DateTime @default(now()) @db.Timestamp(6)
   children           children @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
+  adjustments        adjustments[]
   @@unique([child_id, period])
 }
 
@@ -201,3 +202,16 @@ model meal_rates {
   age        Int     @unique
   daily_rate Decimal @db.Decimal(10, 2)
 }
+
+model adjustments {
+  id         Int      @id @default(autoincrement())
+  charge_id  Int
+  direction  String   @db.VarChar(10)
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String   @db.VarChar(255)
+  created_by Int
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  charges    charges  @relation(fields: [charge_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users      users    @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+

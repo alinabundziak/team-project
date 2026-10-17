@@ -8,6 +8,7 @@ const charges = require('../charges/charges.controller');
 const payments = require('../payments/payments.controller');
 const refunds = require('../refunds/refunds.controller');
 const router = express.Router();
+const adjustments = require('../adjustments/adjustments.controller');
 
 router.get(
   '/children/:childId/tuition-estimate',
@@ -31,5 +32,7 @@ router.post('/children/:childId/payments', authenticate, authorizeRoles(ROLES.AD
 router.post('/children/:childId/refunds', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(refunds.create));
 
 router.get('/children/:childId/financial-history', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(charges.history));
+
+router.post('/children/:childId/adjustments', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(adjustments.create));
 
 module.exports = router;
