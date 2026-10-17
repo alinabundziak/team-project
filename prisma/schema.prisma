@@ -81,6 +81,7 @@ model children {
   parents       parents?        @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   subscriptions subscriptions[]
   charges       charges[]
+  payments      payments[]
 }
 
 model meal_plans {
@@ -165,4 +166,22 @@ model charges {
   children           children @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@unique([child_id, period])
+}
+
+model payments {
+  id         Int       @id @default(autoincrement())
+  child_id   Int
+  amount     Decimal   @db.Decimal(10, 2)
+  created_at DateTime  @default(now()) @db.Timestamp(6)
+  children   children  @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  refunds    refunds[]
+}
+
+model refunds {
+  id         Int      @id @default(autoincrement())
+  payment_id Int
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String?  @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  payments   payments @relation(fields: [payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 }

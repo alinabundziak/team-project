@@ -9,7 +9,8 @@ const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
 const { parsePagination } = require('../../utils/pagination');
 const { calculateAge, formatDateOnly } = require('../../utils/age');
-
+const paymentsRepo = require('../payments/payments.repository');
+const refundsRepo = require('../refunds/refunds.repository');
 const Decimal = Prisma.Decimal;
 
 function parseMonth(value) {
@@ -113,10 +114,14 @@ async function listCharges(rawChildId, query = {}) {
 
 async function getBalance(rawChildId) {
   const child = await requireChild(rawChildId);
-  const charged = await repo.sumTotalByChild(child.id);
 
+  const [charged, paid, refunded] = await Promise.all([
+    repo.sumTotalByChild(child.id),
+    paymentsRepo.sumByChild(child.id),
+    refundsRepo.sumByChild(child.id),
+  ]);
 
-  const result = calculateDebt({ charged });
+  const result = calculateDebt({ charged, paid, refunded });
 
   return { childId: child.id, ...result };
 }
