@@ -30,4 +30,6 @@ router.get('/children/:childId/balance', authenticate, authorizeRoles(ROLES.ADMI
 router.post('/children/:childId/payments', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(payments.create));
 router.post('/children/:childId/refunds', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(refunds.create));
 
+router.get('/children/:childId/financial-history', authenticate, authorizeRoles(ROLES.ADMIN), asyncHandler(charges.history));
+
 module.exports = router;

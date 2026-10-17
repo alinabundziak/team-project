@@ -12,4 +12,8 @@ async function balance(req, res) {
   res.status(200).json(await service.getBalance(req.params.childId));
 }
 
-module.exports = { list, create, balance };
+async function history(req, res) {
+  res.status(200).json(await service.getFinancialHistory(req.params.childId));
+}
+
+module.exports = { list, create, balance, history };

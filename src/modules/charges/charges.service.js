@@ -126,4 +126,52 @@ async function getBalance(rawChildId) {
   return { childId: child.id, ...result };
 }
 
-module.exports = { createCharge, listCharges, getBalance };
+async function getFinancialHistory(rawChildId) {
+  const child = await requireChild(rawChildId);
+
+  const [charges, payments, refunds] = await Promise.all([
+    repo.findMany({ where: { child_id: child.id } }),
+    paymentsRepo.findManyByChild(child.id),
+    refundsRepo.findManyByChild(child.id),
+  ]);
+
+  const events = [
+    ...charges.map((c) => {
+      const dto = toChargeDto(c);
+      return {
+        type: 'CHARGE',
+        id: c.id,
+        date: c.created_at,
+        amount: dto.totalAmount,
+        details: {
+          month: dto.month,
+          baseFee: dto.baseFee,
+          discountPercent: dto.discountPercent,
+          tuitionAmount: dto.tuitionAmount,
+          mealPricePerDay: dto.mealPricePerDay,
+          mealDays: dto.mealDays,
+          mealAmount: dto.mealAmount,
+        },
+      };
+    }),
+    ...payments.map((p) => ({
+      type: 'PAYMENT',
+      id: p.id,
+      date: p.created_at,
+      amount: p.amount.toFixed(2),
+    })),
+    ...refunds.map((r) => ({
+      type: 'REFUND',
+      id: r.id,
+      date: r.created_at,
+      amount: r.amount.toFixed(2),
+      details: { paymentId: r.payment_id, reason: r.reason },
+    })),
+  ];
+
+  events.sort((a, b) => b.date - a.date || b.id - a.id);
+
+  return { childId: child.id, data: events };
+}
+
+module.exports = { createCharge, listCharges, getBalance, getFinancialHistory };

@@ -16,4 +16,8 @@ async function sumByChild(childId) {
   return res._sum.amount ?? 0;
 }
 
-module.exports = { create, findById, sumByChild };
+function findManyByChild(childId) {
+  return prisma.payments.findMany({ where: { child_id: childId } });
+}
+
+module.exports = { create, findById, sumByChild, findManyByChild };
