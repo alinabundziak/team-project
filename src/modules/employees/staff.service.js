@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const payrollService = require("../payroll/payroll.service");
 
 function createStaffError(message, code, status) {
     const error = new Error(message);
@@ -220,10 +221,96 @@ async function deleteStaff(id) {
     });
 }
 
+async function getSalaryEstimates() {
+    const [groups, roomsCount, payroll] = await Promise.all([
+        prisma.groups.findMany({
+            select: {
+                id: true,
+                name: true,
+                room: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                children: {
+                    select: { id: true }
+                },
+                employees_educator: {
+                    select: {
+                        id: true,
+                        first_name: true,
+                        last_name: true
+                    }
+                },
+                employees_assistant: {
+                    select: {
+                        id: true,
+                        first_name: true,
+                        last_name: true
+                    }
+                }
+            },
+            orderBy: { id: "asc" }
+        }),
+        prisma.rooms.count(),
+        payrollService.getKindergartenPayroll()
+    ]);
+
+    const groupEstimates = groups.map(group => {
+        const childrenCount = group.children.length;
+
+        const educatorSalary = group.employees_educator
+            ? payrollService.calculateSalary("EDUCATOR", childrenCount)
+            : 0;
+
+        const assistantSalary = group.employees_assistant
+            ? payrollService.calculateSalary("ASSISTANT")
+            : 0;
+
+        return {
+            groupId: group.id,
+            groupName: group.name,
+            room: group.room,
+            childrenCount,
+            educator: group.employees_educator
+                ? {
+                    id: group.employees_educator.id,
+                    fullName: `${group.employees_educator.first_name} ${group.employees_educator.last_name}`,
+                    monthlySalary: educatorSalary
+                }
+                : null,
+            assistant: group.employees_assistant
+                ? {
+                    id: group.employees_assistant.id,
+                    fullName: `${group.employees_assistant.first_name} ${group.employees_assistant.last_name}`,
+                    monthlySalary: assistantSalary
+                }
+                : null,
+            monthlyPersonnelExpenses: educatorSalary + assistantSalary
+        };
+    });
+
+    const monthlyRent = roomsCount * 50000;
+
+    return {
+        currency: "UAH",
+        groups: groupEstimates,
+        totalMonthlyPersonnelExpenses: payroll.totalMonthlySalary,
+        rent: {
+            roomCount: roomsCount,
+            monthlyCostPerRoom: 50000,
+            totalMonthlyRent: monthlyRent
+        },
+        totalMonthlyExpenses: payroll.totalMonthlySalary + monthlyRent
+    };
+}
+
 module.exports = {
     getStaff,
     getStaffById,
     createStaff,
     updateStaff,
-    deleteStaff
+    deleteStaff,
+    getSalaryEstimates
 };

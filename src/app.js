@@ -24,5 +24,6 @@ app.use("/groups", groupsRoutes);
 
 app.use("/api/groups", groupsRoutes);
 app.use("/api/payroll", payrollRoutes);
+app.use("/api/staff", staffRoutes);
 
 module.exports = app;

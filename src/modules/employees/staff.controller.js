@@ -325,10 +325,20 @@ async function deleteStaff(req, res) {
     }
 }
 
+async function getSalaryEstimates(req, res) {
+    try {
+        const estimates = await service.getSalaryEstimates();
+        return res.status(200).json(estimates);
+    } catch (error) {
+        return handleStaffError(error, res);
+    }
+}
+
 module.exports = {
     getStaff,
     getStaffById,
     createStaff,
     updateStaff,
-    deleteStaff
+    deleteStaff,
+    getSalaryEstimates
 };
