@@ -21,6 +21,7 @@ model users {
   employees     employees?
   parents       parents?
   roles         roles?     @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  adjustments   adjustments[]
 }
 
 model employees {
@@ -80,6 +81,8 @@ model children {
   groups        groups?         @relation(fields: [group_id], references: [id], onUpdate: NoAction)
   parents       parents?        @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   subscriptions subscriptions[]
+  charges       charges[]
+  payments      payments[]
 }
 
 model meal_plans {
@@ -148,3 +151,70 @@ model rules {
   is_active        Boolean  @default(true)
   created_at       DateTime @default(now()) @db.Timestamp(6)
 }
+
+model charges {
+  id                 Int      @id @default(autoincrement())
+  child_id           Int
+  period             DateTime @db.Date
+  base_fee           Decimal  @db.Decimal(10, 2)
+  discount_percent   Decimal  @db.Decimal(5, 2)
+  tuition_amount     Decimal  @db.Decimal(10, 2)
+  meal_price_per_day Decimal  @db.Decimal(10, 2)
+  meal_days          Int
+  meal_amount        Decimal  @db.Decimal(10, 2)
+  total_amount       Decimal  @db.Decimal(10, 2)
+  created_at         DateTime @default(now()) @db.Timestamp(6)
+  children           children @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  adjustments        adjustments[]
+  @@unique([child_id, period])
+}
+
+model payments {
+  id         Int       @id @default(autoincrement())
+  child_id   Int
+  amount     Decimal   @db.Decimal(10, 2)
+  created_at DateTime  @default(now()) @db.Timestamp(6)
+  children   children  @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  refunds    refunds[]
+}
+
+model refunds {
+  id         Int      @id @default(autoincrement())
+  payment_id Int
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String?  @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  payments   payments @relation(fields: [payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+
+model tariffs {
+  id         Int      @id @default(autoincrement())
+  code       String   @db.VarChar(30)
+  amount     Decimal  @db.Decimal(10, 2)
+  valid_from DateTime @db.Date
+  created_at DateTime @default(now()) @db.Timestamp(6)
+
+  @@unique([code, valid_from])
+}
+
+model meal_rates {
+  id         Int      @id @default(autoincrement())
+  age        Int
+  daily_rate Decimal  @db.Decimal(10, 2)
+  valid_from DateTime @db.Date
+
+  @@unique([age, valid_from])
+}
+
+model adjustments {
+  id         Int      @id @default(autoincrement())
+  charge_id  Int
+  direction  String   @db.VarChar(10)
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String   @db.VarChar(255)
+  created_by Int
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  charges    charges  @relation(fields: [charge_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users      users    @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+
