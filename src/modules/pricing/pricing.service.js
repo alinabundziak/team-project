@@ -6,6 +6,9 @@ const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
 const cfg = require('../../config/pricing');
 const { calculateTuition } = require('./tuition.calculator');
+const pricingRepo = require('./pricing.repository');
+const { calculateAge } = require('../../utils/age');
+const { mealPricePerDay, mealPriceForDays } = require('./meal.calculator');
 
 const Decimal = Prisma.Decimal;
 const PERIODS = ['MONTHLY', 'ANNUAL'];
@@ -60,4 +63,57 @@ async function estimateTuition(rawChildId, query = {}) {
   };
 }
 
-module.exports = { estimateTuition };
+function parseDays(value) {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    throw new AppError(400, 'days має бути цілим числом від 1 до 31');
+  }
+  const n = Number(value);
+  if (n < 1 || n > 31) {
+    throw new AppError(400, 'days має бути цілим числом від 1 до 31');
+  }
+  return n;
+}
+
+async function estimateMeals(rawChildId, query = {}) {
+  const childId = parseId(rawChildId, 'childId');
+  const days = parseDays(query.days);
+
+  const child = await childrenRepo.findById(childId);
+  if (!child) throw new AppError(404, 'Дитину не знайдено');
+
+  const age = calculateAge(child.birth_date);
+  if (age < cfg.MEAL_MIN_AGE || age > cfg.MEAL_MAX_AGE) {
+    throw new AppError(409, `Вік дитини (${age}) поза діапазоном харчування ${cfg.MEAL_MIN_AGE}-${cfg.MEAL_MAX_AGE}`);
+  }
+
+  const pricePerDay = mealPricePerDay(age);
+  let total;
+  let billedDays;
+  let source;
+
+  if (days === undefined) {
+    const plan = await pricingRepo.findMealPlanByAge(age);
+    if (!plan) {
+      throw new AppError(409, `У meal_plans немає ціни для віку ${age}. Запусти scripts/seed-meal-plans.js`);
+    }
+    total = new Decimal(plan.monthly_price).toDecimalPlaces(2);
+    billedDays = cfg.MEAL_DAYS_PER_MONTH;
+    source = 'MONTHLY_PLAN';
+  } else {
+    total = mealPriceForDays(age, days);
+    billedDays = days;
+    source = 'DAILY_FORMULA';
+  }
+
+  return {
+    childId,
+    age,
+    pricePerDay: pricePerDay.toFixed(2),
+    days: billedDays,
+    source,
+    total: total.toFixed(2),
+  };
+}
+
+module.exports = { estimateTuition, estimateMeals };

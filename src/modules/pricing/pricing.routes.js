@@ -14,4 +14,11 @@ router.get(
   asyncHandler(controller.tuitionEstimate)
 );
 
+router.get(
+  '/children/:childId/meal-estimate',
+  authenticate,
+  authorizeRoles(ROLES.ADMIN),
+  asyncHandler(controller.mealEstimate)
+);
+
 module.exports = router;
