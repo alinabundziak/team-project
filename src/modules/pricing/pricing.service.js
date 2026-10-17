@@ -75,6 +75,38 @@ function parseDays(value) {
   return n;
 }
 
+async function calculateMealAmount(age, days) {
+  if (age < cfg.MEAL_MIN_AGE || age > cfg.MEAL_MAX_AGE) {
+    throw new AppError(409, `Вік дитини (${age}) поза діапазоном харчування ${cfg.MEAL_MIN_AGE}-${cfg.MEAL_MAX_AGE}. Для нарахування без харчування вкажіть mealDays: 0`);
+  }
+
+  const pricePerDay = mealPricePerDay(age);
+
+  if (days === undefined) {
+    const plan = await pricingRepo.findMealPlanByAge(age);
+    if (!plan) {
+      throw new AppError(409, `У meal_plans немає ціни для віку ${age}. Запусти scripts/seed-meal-plans.js`);
+    }
+    return {
+      pricePerDay,
+      days: cfg.MEAL_DAYS_PER_MONTH,
+      total: new Decimal(plan.monthly_price).toDecimalPlaces(2),
+      source: 'MONTHLY_PLAN',
+    };
+  }
+
+  return { pricePerDay, days, total: mealPriceForDays(age, days), source: 'DAILY_FORMULA' };
+}
+
+async function getChildDiscountPercent(child) {
+  const discount = await resolveDiscount(child, undefined);
+  const percent = discount ? new Decimal(discount.percentage) : new Decimal(0);
+  if (!isSupportedPercent(percent)) {
+    throw new AppError(409, `Непідтримуваний розмір знижки: ${percent.toString()}%`);
+  }
+  return percent;
+}
+
 async function estimateMeals(rawChildId, query = {}) {
   const childId = parseId(rawChildId, 'childId');
   const days = parseDays(query.days);
@@ -83,37 +115,16 @@ async function estimateMeals(rawChildId, query = {}) {
   if (!child) throw new AppError(404, 'Дитину не знайдено');
 
   const age = calculateAge(child.birth_date);
-  if (age < cfg.MEAL_MIN_AGE || age > cfg.MEAL_MAX_AGE) {
-    throw new AppError(409, `Вік дитини (${age}) поза діапазоном харчування ${cfg.MEAL_MIN_AGE}-${cfg.MEAL_MAX_AGE}`);
-  }
-
-  const pricePerDay = mealPricePerDay(age);
-  let total;
-  let billedDays;
-  let source;
-
-  if (days === undefined) {
-    const plan = await pricingRepo.findMealPlanByAge(age);
-    if (!plan) {
-      throw new AppError(409, `У meal_plans немає ціни для віку ${age}. Запусти scripts/seed-meal-plans.js`);
-    }
-    total = new Decimal(plan.monthly_price).toDecimalPlaces(2);
-    billedDays = cfg.MEAL_DAYS_PER_MONTH;
-    source = 'MONTHLY_PLAN';
-  } else {
-    total = mealPriceForDays(age, days);
-    billedDays = days;
-    source = 'DAILY_FORMULA';
-  }
+  const meal = await calculateMealAmount(age, days);
 
   return {
     childId,
     age,
-    pricePerDay: pricePerDay.toFixed(2),
-    days: billedDays,
-    source,
-    total: total.toFixed(2),
+    pricePerDay: meal.pricePerDay.toFixed(2),
+    days: meal.days,
+    source: meal.source,
+    total: meal.total.toFixed(2),
   };
 }
 
-module.exports = { estimateTuition, estimateMeals };
+module.exports = { estimateTuition, estimateMeals, calculateMealAmount, getChildDiscountPercent };
