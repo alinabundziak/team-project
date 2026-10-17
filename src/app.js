@@ -34,6 +34,8 @@ app.use('/api/parents', require('./modules/parents/parents.routes'));
 app.use('/api/discounts', require('./modules/discounts/discounts.routes'));
 app.use('/api', require('./modules/pricing/pricing.routes'));
 
+app.use('/api/tariffs', require('./modules/tariffs/tariffs.routes'));
+
 app.use(errorHandler);
 
 module.exports = app;

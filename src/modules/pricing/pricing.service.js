@@ -8,6 +8,7 @@ const cfg = require('../../config/pricing');
 const { calculateTuition } = require('./tuition.calculator');
 const pricingRepo = require('./pricing.repository');
 const { calculateAge } = require('../../utils/age');
+const { getTariffAmount } = require('../tariffs/tariffs.service');
 const { mealPricePerDay, mealPriceForDays } = require('./meal.calculator');
 
 const Decimal = Prisma.Decimal;
@@ -28,7 +29,7 @@ async function resolveDiscount(child, overrideId) {
     if (!d) throw new AppError(404, 'Знижку не знайдено');
     return d;
   }
-  if (child.discount_id === null) return null; // без знижки
+  if (child.discount_id === null) return null;
   const d = await discountsRepo.findById(child.discount_id);
   if (!d) throw new AppError(409, 'Знижку дитини не знайдено в довіднику');
   return d;
@@ -50,8 +51,9 @@ async function estimateTuition(rawChildId, query = {}) {
     throw new AppError(409, `Непідтримуваний розмір знижки: ${percent.toString()}%. Дозволено: ${cfg.ALLOWED_DISCOUNT_PERCENTS.join(', ')}`);
   }
 
+  const baseFee = await getTariffAmount(cfg.TARIFF_TUITION_CODE, startOfMonthUtc(todayUtc()));
   const calculation = calculateTuition({
-    baseFee: cfg.TUITION_MONTHLY,
+    baseFee,
     discountPercent: percent,
     period,
   });

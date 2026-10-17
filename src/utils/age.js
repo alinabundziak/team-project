@@ -36,4 +36,8 @@ function formatDateOnly(date) {
   return date.toISOString().slice(0, 10);
 }
 
-module.exports = { parseDateOnly, todayUtc, calculateAge, formatDateOnly };
+function startOfMonthUtc(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+module.exports = { parseDateOnly, todayUtc, calculateAge, formatDateOnly, startOfMonthUtc };

@@ -12,6 +12,7 @@ const { calculateAge, formatDateOnly } = require('../../utils/age');
 const paymentsRepo = require('../payments/payments.repository');
 const refundsRepo = require('../refunds/refunds.repository');
 const Decimal = Prisma.Decimal;
+const { getTariffAmount } = require('../tariffs/tariffs.service');
 
 function parseMonth(value) {
   const m = typeof value === 'string' ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value.trim()) : null;
@@ -59,8 +60,9 @@ async function createCharge(rawChildId, input) {
   const child = await requireChild(rawChildId);
 
   const discountPercent = await pricing.getChildDiscountPercent(child);
+  const baseFee = await getTariffAmount(cfg.TARIFF_TUITION_CODE, periodStart);
   const tuition = calculateTuition({
-    baseFee: cfg.TUITION_MONTHLY,
+    baseFee,
     discountPercent,
     period: 'MONTHLY',
   });
@@ -103,7 +105,6 @@ async function listCharges(rawChildId, query = {}) {
   const { page, limit } = parsePagination(query);
   const where = { child_id: child.id };
 
-  // два окремі запити (не транзакція)
   const [items, total] = await Promise.all([
     repo.findMany({ where, skip: (page - 1) * limit, take: limit }),
     repo.count(where),

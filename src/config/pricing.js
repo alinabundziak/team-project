@@ -8,4 +8,5 @@ module.exports = Object.freeze({
   MEAL_MIN_AGE: 2,
   MEAL_MAX_AGE: 5,
   MEAL_DAYS_PER_MONTH: 21,
+  TARIFF_TUITION_CODE: 'TUITION_MONTHLY',
 });
