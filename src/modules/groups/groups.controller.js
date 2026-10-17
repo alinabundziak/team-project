@@ -129,6 +129,19 @@ function validateGroupData(body, partial = false) {
     return { data };
 }
 
+async function getGroupsOccupancy(req, res) {
+    try {
+        const occupancy = await service.getGroupsOccupancy();
+
+        return res.status(200).json({
+            count: occupancy.length,
+            groups: occupancy
+        });
+    } catch (error) {
+        return handleGroupError(error, res);
+    }
+}
+
 async function getGroups(req, res) {
     try {
         const groups = await service.getGroups();
@@ -341,6 +354,7 @@ async function removeStaffFromGroup(req, res) {
 }
 
 module.exports = {
+    getGroupsOccupancy,
     getGroups,
     createGroup,
     getGroupById,

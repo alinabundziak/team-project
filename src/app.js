@@ -20,4 +20,6 @@ app.use("/rooms", roomsRoutes);
 app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
 
+app.use("/api/groups", groupsRoutes);
+
 module.exports = app;
