@@ -1,11 +1,18 @@
 {
   "name": "team-project",
   "version": "1.0.0",
-  "description": "**Дата:** 06.10.2026",
-  "main": "index.js",
+  "private": true,
+  "description": "Backend starter for Kindergarten Management System using Node.js, Prisma, and Supabase PostgreSQL",
+  "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "db:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "db:push": "prisma db push",
+    "db:validate": "prisma validate",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed"
   },
   "repository": {
     "type": "git",
@@ -23,6 +30,7 @@
     "@prisma/client": "^5.22.0",
     "decimal.js": "^10.6.0",
     "dotenv": "^18.0.7",
+    "@prisma/client": "5.22.0",
     "express": "^5.2.1"
   },
   "devDependencies": {
