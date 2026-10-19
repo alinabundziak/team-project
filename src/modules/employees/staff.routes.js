@@ -13,6 +13,7 @@ router.use(
 
 router.get("/", controller.getStaff);
 router.get("/salary-estimates", controller.getSalaryEstimates);
+router.get("/distribution-analysis", controller.getStaffDistributionAnalysis);
 
 router.post("/", controller.createStaff);
 router.get("/:id", controller.getStaffById);

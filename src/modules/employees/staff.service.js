@@ -306,11 +306,260 @@ async function getSalaryEstimates() {
     };
 }
 
+async function getStaffDistributionAnalysis(options = {}) {
+    const { groupId, childrenCount } = options;
+    const [groups, employees] = await Promise.all([
+        prisma.groups.findMany({
+            select: {
+                id: true,
+                name: true,
+                target_age: true,
+                capacity: true,
+                children: {
+                    select: { id: true }
+                },
+                employees_educator: {
+                    select: {
+                        id: true,
+                        first_name: true,
+                        last_name: true,
+                        position: true
+                    }
+                },
+                employees_assistant: {
+                    select: {
+                        id: true,
+                        first_name: true,
+                        last_name: true,
+                        position: true
+                    }
+                },
+                staff_assignments: {
+                    select: {
+                        employee: {
+                            select: {
+                                id: true,
+                                first_name: true,
+                                last_name: true,
+                                position: true
+                            }
+                        }
+                    }
+                },
+                schedules: {
+                    select: {
+                        employees: {
+                            select: {
+                                id: true,
+                                first_name: true,
+                                last_name: true,
+                                position: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { id: "asc" }
+        }),
+        prisma.employees.findMany({
+            select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                position: true
+            },
+            orderBy: { id: "asc" }
+        })
+    ]);
+
+    const assignedGroupsByEmployee = new Map();
+
+    const groupAnalysis = groups.map(group => {
+        const groupStaff = new Map();
+
+        function addStaff(employee, assignmentType) {
+            if (!employee) {
+                return;
+            }
+
+            if (!groupStaff.has(employee.id)) {
+                groupStaff.set(employee.id, {
+                    id: employee.id,
+                    fullName:
+                        `${employee.first_name} ${employee.last_name}`,
+                    position: employee.position,
+                    assignmentTypes: []
+                });
+            }
+
+            const staffMember = groupStaff.get(employee.id);
+
+            if (!staffMember.assignmentTypes.includes(assignmentType)) {
+                staffMember.assignmentTypes.push(assignmentType);
+            }
+        }
+
+        addStaff(group.employees_educator, "EDUCATOR_SLOT");
+        addStaff(group.employees_assistant, "ASSISTANT_SLOT");
+
+        for (const assignment of group.staff_assignments) {
+            addStaff(assignment.employee, "STAFF_ASSIGNMENT");
+        }
+
+        for (const schedule of group.schedules) {
+            addStaff(schedule.employees, "SCHEDULE");
+        }
+
+        const assignedStaff = [...groupStaff.values()];
+
+        for (const employee of assignedStaff) {
+            if (!assignedGroupsByEmployee.has(employee.id)) {
+                assignedGroupsByEmployee.set(employee.id, new Set());
+            }
+
+            assignedGroupsByEmployee.get(employee.id).add(group.id);
+        }
+
+        const educatorsCount = assignedStaff.filter(
+            employee => employee.position === "EDUCATOR"
+        ).length;
+
+        const assistantsCount = assignedStaff.filter(
+            employee => employee.position === "ASSISTANT"
+        ).length;
+
+        function getRoleStatus(actual) {
+            if (actual < 1) {
+                return "SHORTAGE";
+            }
+
+            if (actual > 1) {
+                return "SURPLUS";
+            }
+
+            return "OK";
+        }
+
+        return {
+            groupId: group.id,
+            groupName: group.name,
+            ageYears: group.target_age,
+            childrenCount: group.children.length,
+            capacity: group.capacity,
+
+            staffing: {
+                educators: {
+                    required: 1,
+                    actual: educatorsCount,
+                    status: getRoleStatus(educatorsCount)
+                },
+                assistants: {
+                    required: 1,
+                    actual: assistantsCount,
+                    status: getRoleStatus(assistantsCount)
+                }
+            },
+
+            assignedStaff,
+
+            hasShortage: educatorsCount < 1 || assistantsCount < 1,
+            hasSurplus: educatorsCount > 1 || assistantsCount > 1
+        };
+    });
+
+    const unassignedEmployees = employees
+        .filter(employee => !assignedGroupsByEmployee.has(employee.id))
+        .map(employee => ({
+            id: employee.id,
+            fullName: `${employee.first_name} ${employee.last_name}`,
+            position: employee.position
+        }));
+
+        let scenario = null;
+
+    if (groupId !== undefined) {
+        const group = groupAnalysis.find(item => item.groupId === groupId);
+
+        if (!group) {
+            throw createStaffError(
+                "Групу не знайдено",
+                "GROUP_NOT_FOUND",
+                404
+            );
+        }
+
+        const capacityLimit = Math.min(group.capacity, 20);
+
+        function getCapacityStatus(count) {
+            return count > capacityLimit
+                ? "OVER_CAPACITY"
+                : "WITHIN_CAPACITY";
+        }
+
+        scenario = {
+            groupId: group.groupId,
+            groupName: group.groupName,
+
+            current: {
+                childrenCount: group.childrenCount,
+                capacityLimit,
+                capacityStatus: getCapacityStatus(group.childrenCount)
+            },
+
+            simulated: {
+                childrenCount,
+                childrenDifference: childrenCount - group.childrenCount,
+                capacityLimit,
+                capacityStatus: getCapacityStatus(childrenCount)
+            },
+
+            staffingNeed: {
+                educators: {
+                    currentRequired: 1,
+                    simulatedRequired: 1,
+                    change: 0
+                },
+                assistants: {
+                    currentRequired: 1,
+                    simulatedRequired: 1,
+                    change: 0
+                },
+                otherStaffRuleDefined: false
+            },
+
+            staffingNeedChanged: false
+        };
+    }
+
+    const result = {
+        summary: {
+            groupsCount: groupAnalysis.length,
+            groupsWithShortage: groupAnalysis.filter(
+                group => group.hasShortage
+            ).length,
+            groupsWithSurplus: groupAnalysis.filter(
+                group => group.hasSurplus
+            ).length,
+            employeesCount: employees.length,
+            unassignedEmployeesCount: unassignedEmployees.length
+        },
+        groups: groupAnalysis,
+        unassignedEmployees
+    };
+
+    if (scenario) {
+        result.scenario = scenario;
+    }
+
+    return result;
+}
+
 module.exports = {
     getStaff,
     getStaffById,
     createStaff,
     updateStaff,
     deleteStaff,
-    getSalaryEstimates
+    getSalaryEstimates,
+    getStaffDistributionAnalysis
 };
