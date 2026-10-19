@@ -94,6 +94,71 @@ async function getGroupPayroll(groupId) {
     };
 }
 
+/**
+ * Розраховує кошторис за погодженою формулою незалежно від фактичних
+ * призначень працівників у групи.
+ *
+ * Σ(зарплата вихователя + 20 000 грн помічнику для кожної групи)
+ * + 40 000 грн за кожного TEACHER + 80 000 грн за одного менеджера.
+ */
+function calculateKindergartenSalaryEstimate(groups, teachersCount) {
+    const groupEstimates = groups.map(group => {
+        const childrenCount = group.children.length;
+        const educatorMonthlySalary = calculateEducatorSalary(childrenCount);
+        const assistantMonthlySalary = SALARIES.ASSISTANT;
+
+        return {
+            groupId: group.id,
+            groupName: group.name,
+            childrenCount,
+            educatorMonthlySalary,
+            assistantMonthlySalary,
+            totalMonthlySalary:
+                educatorMonthlySalary + assistantMonthlySalary
+        };
+    });
+
+    const groupsMonthlySalary = groupEstimates.reduce(
+        (total, group) => total + group.totalMonthlySalary,
+        0
+    );
+    const teachersMonthlySalary = teachersCount * SALARIES.TEACHER;
+    const managerMonthlySalary = SALARIES.MANAGER;
+
+    return {
+        groups: groupEstimates,
+        groupsMonthlySalary,
+        teachersCount,
+        teachersMonthlySalary,
+        managerCount: 1,
+        managerMonthlySalary,
+        totalMonthlySalary:
+            groupsMonthlySalary +
+            teachersMonthlySalary +
+            managerMonthlySalary
+    };
+}
+
+async function getKindergartenSalaryEstimate(groups) {
+    const groupsForEstimate = groups ?? await prisma.groups.findMany({
+        select: {
+            id: true,
+            name: true,
+            children: { select: { id: true } }
+        },
+        orderBy: { id: "asc" }
+    });
+
+    const teachersCount = await prisma.employees.count({
+        where: { position: "TEACHER" }
+    });
+
+    return calculateKindergartenSalaryEstimate(
+        groupsForEstimate,
+        teachersCount
+    );
+}
+
 async function getKindergartenPayroll() {
     const [groups, employees] = await Promise.all([
         prisma.groups.findMany({
@@ -178,6 +243,8 @@ async function getKindergartenPayroll() {
 module.exports = {
     calculateEducatorSalary,
     calculateSalary,
+    calculateKindergartenSalaryEstimate,
+    getKindergartenSalaryEstimate,
     getGroupPayroll,
     getKindergartenPayroll
 };

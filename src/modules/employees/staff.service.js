@@ -5,7 +5,6 @@ function createStaffError(message, code, status) {
     const error = new Error(message);
     error.code = code;
     error.status = status;
-
     return error;
 }
 
@@ -32,7 +31,8 @@ function formatStaff(staff, includeSalary = false) {
     };
 
     if (includeSalary) {
-        result.monthlySalary = Number(staff.salary);
+        result.monthlySalary =
+            staff.salary == null ? null : Number(staff.salary);
     }
 
     return result;
@@ -51,9 +51,7 @@ async function getStaff(includeSalary = false) {
 
 async function getStaffById(id, includeSalary = false) {
     const staff = await prisma.employees.findUnique({
-        where: {
-            id
-        },
+        where: { id },
         select: staffSelect
     });
 
@@ -95,12 +93,8 @@ async function createStaff(data, includeSalary = false) {
 
 async function updateStaff(id, data, includeSalary = false) {
     const existingStaff = await prisma.employees.findUnique({
-        where: {
-            id
-        },
-        select: {
-            id: true
-        }
+        where: { id },
+        select: { id: true }
     });
 
     if (!existingStaff) {
@@ -142,9 +136,7 @@ async function updateStaff(id, data, includeSalary = false) {
     }
 
     const staff = await prisma.employees.update({
-        where: {
-            id
-        },
+        where: { id },
         data: updateData,
         select: staffSelect
     });
@@ -154,12 +146,8 @@ async function updateStaff(id, data, includeSalary = false) {
 
 async function deleteStaff(id) {
     const existingStaff = await prisma.employees.findUnique({
-        where: {
-            id
-        },
-        select: {
-            id: true
-        }
+        where: { id },
+        select: { id: true }
     });
 
     if (!existingStaff) {
@@ -184,16 +172,19 @@ async function deleteStaff(id) {
                 ]
             }
         }),
+
         prisma.schedules.count({
             where: {
                 teacher_id: id
             }
         }),
+
         prisma.teacher_activities.count({
             where: {
                 employee_id: id
             }
         }),
+
         prisma.staff_assignments.count({
             where: {
                 employee_id: id
@@ -215,99 +206,102 @@ async function deleteStaff(id) {
     }
 
     return prisma.employees.delete({
-        where: {
-            id
-        }
+        where: { id }
     });
 }
 
 async function getSalaryEstimates() {
-    const [groups, roomsCount, payroll] = await Promise.all([
-        prisma.groups.findMany({
-            select: {
-                id: true,
-                name: true,
-                room: {
-                    select: {
-                        id: true,
-                        name: true
-                    }
-                },
-                children: {
-                    select: { id: true }
-                },
-                employees_educator: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
-                employees_assistant: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
+    const groups = await prisma.groups.findMany({
+        select: {
+            id: true,
+            name: true,
+            room: {
+                select: {
+                    id: true,
+                    name: true
                 }
             },
-            orderBy: { id: "asc" }
-        }),
-        prisma.rooms.count(),
-        payrollService.getKindergartenPayroll()
-    ]);
+            children: {
+                select: { id: true }
+            },
+            employees_educator: {
+                select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true
+                }
+            },
+            employees_assistant: {
+                select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true
+                }
+            }
+        },
+        orderBy: { id: "asc" }
+    });
+
+    // Кошторис визначається формулою завдання, а не фактичними призначеннями.
+    const payrollEstimate =
+        await payrollService.getKindergartenSalaryEstimate(groups);
+
+    const estimatedGroupsById = new Map(
+        payrollEstimate.groups.map(group => [group.groupId, group])
+    );
 
     const groupEstimates = groups.map(group => {
-        const childrenCount = group.children.length;
-
-        const educatorSalary = group.employees_educator
-            ? payrollService.calculateSalary("EDUCATOR", childrenCount)
-            : 0;
-
-        const assistantSalary = group.employees_assistant
-            ? payrollService.calculateSalary("ASSISTANT")
-            : 0;
+        const estimate = estimatedGroupsById.get(group.id);
 
         return {
             groupId: group.id,
             groupName: group.name,
             room: group.room,
-            childrenCount,
-            educator: group.employees_educator
-                ? {
-                    id: group.employees_educator.id,
-                    fullName: `${group.employees_educator.first_name} ${group.employees_educator.last_name}`,
-                    monthlySalary: educatorSalary
-                }
-                : null,
-            assistant: group.employees_assistant
-                ? {
-                    id: group.employees_assistant.id,
-                    fullName: `${group.employees_assistant.first_name} ${group.employees_assistant.last_name}`,
-                    monthlySalary: assistantSalary
-                }
-                : null,
-            monthlyPersonnelExpenses: educatorSalary + assistantSalary
+            childrenCount: group.children.length,
+            educator: {
+                id: group.employees_educator?.id ?? null,
+                fullName: group.employees_educator
+                    ? `${group.employees_educator.first_name} ${group.employees_educator.last_name}`
+                    : null,
+                monthlySalary: estimate.educatorMonthlySalary
+            },
+            assistant: {
+                id: group.employees_assistant?.id ?? null,
+                fullName: group.employees_assistant
+                    ? `${group.employees_assistant.first_name} ${group.employees_assistant.last_name}`
+                    : null,
+                monthlySalary: estimate.assistantMonthlySalary
+            },
+            monthlyPersonnelExpenses: estimate.totalMonthlySalary
         };
     });
 
-    const monthlyRent = roomsCount * 50000;
+    const monthlyRent = groups.length * 50000;
 
     return {
         currency: "UAH",
         groups: groupEstimates,
-        totalMonthlyPersonnelExpenses: payroll.totalMonthlySalary,
+        staffCosts: {
+            teachersCount: payrollEstimate.teachersCount,
+            monthlySalaryPerTeacher: 40000,
+            teachersMonthlySalary: payrollEstimate.teachersMonthlySalary,
+            managerCount: 1,
+            managerMonthlySalary: payrollEstimate.managerMonthlySalary
+        },
+        totalMonthlyPersonnelExpenses: payrollEstimate.totalMonthlySalary,
         rent: {
-            roomCount: roomsCount,
+            roomCount: groups.length,
             monthlyCostPerRoom: 50000,
             totalMonthlyRent: monthlyRent
         },
-        totalMonthlyExpenses: payroll.totalMonthlySalary + monthlyRent
+        totalMonthlyExpenses:
+            payrollEstimate.totalMonthlySalary + monthlyRent
     };
 }
 
 async function getStaffDistributionAnalysis(options = {}) {
     const { groupId, childrenCount } = options;
+
     const [groups, employees] = await Promise.all([
         prisma.groups.findMany({
             select: {
@@ -315,9 +309,17 @@ async function getStaffDistributionAnalysis(options = {}) {
                 name: true,
                 target_age: true,
                 capacity: true,
+
+                room: {
+                    select: {
+                        capacity: true
+                    }
+                },
+
                 children: {
                     select: { id: true }
                 },
+
                 employees_educator: {
                     select: {
                         id: true,
@@ -326,6 +328,7 @@ async function getStaffDistributionAnalysis(options = {}) {
                         position: true
                     }
                 },
+
                 employees_assistant: {
                     select: {
                         id: true,
@@ -334,6 +337,7 @@ async function getStaffDistributionAnalysis(options = {}) {
                         position: true
                     }
                 },
+
                 staff_assignments: {
                     select: {
                         employee: {
@@ -346,6 +350,7 @@ async function getStaffDistributionAnalysis(options = {}) {
                         }
                     }
                 },
+
                 schedules: {
                     select: {
                         employees: {
@@ -359,8 +364,10 @@ async function getStaffDistributionAnalysis(options = {}) {
                     }
                 }
             },
+
             orderBy: { id: "asc" }
         }),
+
         prisma.employees.findMany({
             select: {
                 id: true,
@@ -368,6 +375,7 @@ async function getStaffDistributionAnalysis(options = {}) {
                 last_name: true,
                 position: true
             },
+
             orderBy: { id: "asc" }
         })
     ]);
@@ -385,8 +393,10 @@ async function getStaffDistributionAnalysis(options = {}) {
             if (!groupStaff.has(employee.id)) {
                 groupStaff.set(employee.id, {
                     id: employee.id,
+
                     fullName:
                         `${employee.first_name} ${employee.last_name}`,
+
                     position: employee.position,
                     assignmentTypes: []
                 });
@@ -394,30 +404,50 @@ async function getStaffDistributionAnalysis(options = {}) {
 
             const staffMember = groupStaff.get(employee.id);
 
-            if (!staffMember.assignmentTypes.includes(assignmentType)) {
+            if (
+                !staffMember.assignmentTypes.includes(assignmentType)
+            ) {
                 staffMember.assignmentTypes.push(assignmentType);
             }
         }
 
-        addStaff(group.employees_educator, "EDUCATOR_SLOT");
-        addStaff(group.employees_assistant, "ASSISTANT_SLOT");
+        addStaff(
+            group.employees_educator,
+            "EDUCATOR_SLOT"
+        );
 
-        for (const assignment of group.staff_assignments) {
-            addStaff(assignment.employee, "STAFF_ASSIGNMENT");
+        addStaff(
+            group.employees_assistant,
+            "ASSISTANT_SLOT"
+        );
+
+        for (const assignment of (group.staff_assignments || [])) {
+            addStaff(
+                assignment.employee,
+                "STAFF_ASSIGNMENT"
+            );
         }
 
-        for (const schedule of group.schedules) {
-            addStaff(schedule.employees, "SCHEDULE");
+        for (const schedule of (group.schedules || [])) {
+            addStaff(
+                schedule.employees,
+                "SCHEDULE"
+            );
         }
 
         const assignedStaff = [...groupStaff.values()];
 
         for (const employee of assignedStaff) {
             if (!assignedGroupsByEmployee.has(employee.id)) {
-                assignedGroupsByEmployee.set(employee.id, new Set());
+                assignedGroupsByEmployee.set(
+                    employee.id,
+                    new Set()
+                );
             }
 
-            assignedGroupsByEmployee.get(employee.id).add(group.id);
+            assignedGroupsByEmployee
+                .get(employee.id)
+                .add(group.id);
         }
 
         const educatorsCount = assignedStaff.filter(
@@ -445,7 +475,12 @@ async function getStaffDistributionAnalysis(options = {}) {
             groupName: group.name,
             ageYears: group.target_age,
             childrenCount: group.children.length,
+
             capacity: group.capacity,
+
+            roomCapacity: group.room
+                ? group.room.capacity
+                : group.capacity,
 
             staffing: {
                 educators: {
@@ -453,6 +488,7 @@ async function getStaffDistributionAnalysis(options = {}) {
                     actual: educatorsCount,
                     status: getRoleStatus(educatorsCount)
                 },
+
                 assistants: {
                     required: 1,
                     actual: assistantsCount,
@@ -462,23 +498,34 @@ async function getStaffDistributionAnalysis(options = {}) {
 
             assignedStaff,
 
-            hasShortage: educatorsCount < 1 || assistantsCount < 1,
-            hasSurplus: educatorsCount > 1 || assistantsCount > 1
+            hasShortage:
+                educatorsCount < 1 || assistantsCount < 1,
+
+            hasSurplus:
+                educatorsCount > 1 || assistantsCount > 1
         };
     });
 
     const unassignedEmployees = employees
-        .filter(employee => !assignedGroupsByEmployee.has(employee.id))
+        .filter(
+            employee =>
+                !assignedGroupsByEmployee.has(employee.id)
+        )
         .map(employee => ({
             id: employee.id,
-            fullName: `${employee.first_name} ${employee.last_name}`,
+
+            fullName:
+                `${employee.first_name} ${employee.last_name}`,
+
             position: employee.position
         }));
 
-        let scenario = null;
+    let scenario = null;
 
     if (groupId !== undefined) {
-        const group = groupAnalysis.find(item => item.groupId === groupId);
+        const group = groupAnalysis.find(
+            item => item.groupId === groupId
+        );
 
         if (!group) {
             throw createStaffError(
@@ -488,7 +535,21 @@ async function getStaffDistributionAnalysis(options = {}) {
             );
         }
 
-        const capacityLimit = Math.min(group.capacity, 20);
+        if (
+            !Number.isInteger(childrenCount) ||
+            childrenCount < 0
+        ) {
+            throw createStaffError(
+                "Кількість дітей має бути невід’ємним цілим числом",
+                "INVALID_CHILDREN_COUNT",
+                400
+            );
+        }
+
+        const capacityLimit = Math.min(
+            group.capacity,
+            group.roomCapacity
+        );
 
         function getCapacityStatus(count) {
             return count > capacityLimit
@@ -503,14 +564,23 @@ async function getStaffDistributionAnalysis(options = {}) {
             current: {
                 childrenCount: group.childrenCount,
                 capacityLimit,
-                capacityStatus: getCapacityStatus(group.childrenCount)
+
+                capacityStatus: getCapacityStatus(
+                    group.childrenCount
+                )
             },
 
             simulated: {
                 childrenCount,
-                childrenDifference: childrenCount - group.childrenCount,
+
+                childrenDifference:
+                    childrenCount - group.childrenCount,
+
                 capacityLimit,
-                capacityStatus: getCapacityStatus(childrenCount)
+
+                capacityStatus: getCapacityStatus(
+                    childrenCount
+                )
             },
 
             staffingNeed: {
@@ -519,11 +589,13 @@ async function getStaffDistributionAnalysis(options = {}) {
                     simulatedRequired: 1,
                     change: 0
                 },
+
                 assistants: {
                     currentRequired: 1,
                     simulatedRequired: 1,
                     change: 0
                 },
+
                 otherStaffRuleDefined: false
             },
 
@@ -534,15 +606,21 @@ async function getStaffDistributionAnalysis(options = {}) {
     const result = {
         summary: {
             groupsCount: groupAnalysis.length,
+
             groupsWithShortage: groupAnalysis.filter(
                 group => group.hasShortage
             ).length,
+
             groupsWithSurplus: groupAnalysis.filter(
                 group => group.hasSurplus
             ).length,
+
             employeesCount: employees.length,
-            unassignedEmployeesCount: unassignedEmployees.length
+
+            unassignedEmployeesCount:
+                unassignedEmployees.length
         },
+
         groups: groupAnalysis,
         unassignedEmployees
     };
