@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const childrenRoutes = require("./modules/children/children.routes");
@@ -8,7 +9,6 @@ const optimizationRoutes = require("./modules/optimization/optimization.routes")
 const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
-
 const autoScheduleRoutes = require("../controllers/autoScheduleRoutes");
 
 const errorHandler = require("./middleware/errorHandler");
@@ -29,14 +29,21 @@ app.use("/rooms", roomsRoutes);
 app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
 
-app.use("/api/groups", groupsRoutes);
-app.use("/api/payroll", payrollRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/optimization", optimizationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/children", childrenRoutes);
+app.use("/api/parents", require("./modules/parents/parents.routes"));
+
+app.use("/api/groups", groupsRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/optimization", optimizationRoutes);
 
 app.use("/api", autoScheduleRoutes);
+
+app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
+app.use("/api", require("./modules/pricing/pricing.routes"));
+app.use("/api/tariffs", require("./modules/tariffs/tariffs.routes"));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(

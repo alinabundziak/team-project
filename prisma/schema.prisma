@@ -26,19 +26,19 @@ model users {
 }
 
 model employees {
-  id                Int                 @id @default(autoincrement())
-  user_id           Int?                @unique
-  first_name        String              @db.VarChar(100)
-  last_name         String              @db.VarChar(100)
-  phone             String?             @db.VarChar(20)
-  position          String              @db.VarChar(100)
-  subject           String?             @db.VarChar(100)
-  salary            Decimal             @default(40000.00) @db.Decimal(10, 2)
-  users             users?              @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups_assistant  groups[]            @relation("groups_assistant_idToemployees")
-  groups_educator   groups[]            @relation("groups_educator_idToemployees")
-  schedules         schedules[]
-  staff_assignments staff_assignments[]
+  id                 Int                  @id @default(autoincrement())
+  user_id            Int?                 @unique
+  first_name         String               @db.VarChar(100)
+  last_name          String               @db.VarChar(100)
+  phone              String?              @db.VarChar(20)
+  position           String               @db.VarChar(100)
+  subject            String?              @db.VarChar(100)
+  salary             Decimal              @default(40000.00) @db.Decimal(10, 2)
+  users              users?               @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  groups_assistant   groups[]             @relation("groups_assistant_idToemployees")
+  groups_educator    groups[]             @relation("groups_educator_idToemployees")
+  schedules          schedules[]
+  staff_assignments  staff_assignments[]
   teacher_activities teacher_activities[]
 }
 
@@ -135,7 +135,7 @@ model schedules {
 model staff_assignments {
   employee_id Int
   group_id    Int
-  assigned_at DateTime @default(now()) @db.Timestamp(6)
+  assigned_at DateTime  @default(now()) @db.Timestamp(6)
   employee    employees @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   group       groups    @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
@@ -154,19 +154,19 @@ model rules {
 }
 
 model charges {
-  id               Int           @id @default(autoincrement())
-  child_id         Int
-  period           DateTime      @db.Date
-  base_fee         Decimal       @db.Decimal(10, 2)
-  discount_percent Decimal       @db.Decimal(5, 2)
-  tuition_amount   Decimal       @db.Decimal(10, 2)
-  meal_price_per_day Decimal     @db.Decimal(10, 2)
-  meal_days        Int
-  meal_amount      Decimal       @db.Decimal(10, 2)
-  total_amount     Decimal       @db.Decimal(10, 2)
-  created_at       DateTime?     @default(now()) @db.Timestamp(6)
-  adjustments      adjustments[]
-  children         children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id                 Int           @id @default(autoincrement())
+  child_id           Int
+  period             DateTime      @db.Date
+  base_fee           Decimal       @db.Decimal(10, 2)
+  discount_percent   Decimal       @db.Decimal(5, 2)
+  tuition_amount     Decimal       @db.Decimal(10, 2)
+  meal_price_per_day Decimal       @db.Decimal(10, 2)
+  meal_days          Int
+  meal_amount        Decimal       @db.Decimal(10, 2)
+  total_amount       Decimal       @db.Decimal(10, 2)
+  created_at         DateTime?     @default(now()) @db.Timestamp(6)
+  adjustments        adjustments[]
+  children           children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@unique([child_id, period])
 }
@@ -229,8 +229,8 @@ model subscriptions {
 }
 
 model child_benefits {
-  id          Int     @id @default(autoincrement())
-  child_id    Int
+  id           Int    @id @default(autoincrement())
+  child_id     Int
   benefit_type String @db.VarChar(100)
 }
 

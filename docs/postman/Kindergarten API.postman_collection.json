@@ -906,13 +906,285 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Child",
+      "item": [
+        {
+          "name": "Create child",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firstName\":\"Марія\",\"lastName\":\"Коваленко\",\"dateOfBirth\":\"{{birth3}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/children",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get child by manager",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{managerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/children",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get by id",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/children/{{childId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children",
+                "{{childId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rename by manager",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{managerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firstName\":\"Софія\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/children/{{childId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children",
+                "{{childId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Access without loggin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/children",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Access parent",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{parent1Token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/children",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete by manager",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{managerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/children/{{childId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children",
+                "{{childId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Wrong age",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"firstName\":\"Тест\",\"lastName\":\"Тестенко\",\"dateOfBirth\":\"{{birthTooOld}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/children",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "children"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const d = new Date();\r\nconst iso = (years) =>\r\n  new Date(Date.UTC(d.getFullYear() - years, d.getMonth(), d.getDate()))\r\n    .toISOString().slice(0, 10);\r\n\r\npm.collectionVariables.set('birth3', iso(3));     // валідно\r\npm.collectionVariables.set('birthTooOld', iso(6)); // має дати 400"
+            ]
+          }
+        }
+      ]
     }
   ],
   "variable": [
-    {
-      "key": "baseUrl1",
-      "value": ""
-    },
     {
       "key": "adminToken",
       "value": ""
@@ -931,6 +1203,14 @@
     },
     {
       "key": "parent2Token",
+      "value": ""
+    },
+    {
+      "key": "birth3",
+      "value": ""
+    },
+    {
+      "key": "birthTooOld",
       "value": ""
     }
   ]
