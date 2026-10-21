@@ -41,6 +41,10 @@ function findParentByUserId(userId) {
   return prisma.parents.findUnique({ where: { user_id: userId } });
 }
 
+function countCharges(childId) {
+  return prisma.charges.count({ where: { child_id: childId } });
+}
+
 module.exports = {
   findMany,
   count,
@@ -51,4 +55,5 @@ module.exports = {
   findGroupById,
   countSubscriptions,
   findParentByUserId,
+  countCharges,
 };

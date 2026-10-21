@@ -146,7 +146,7 @@ async function deleteChild(rawId) {
   const existing = await repo.findById(id);
   if (!existing) throw new AppError(404, 'Дитину не знайдено');
 
-  if ((await repo.countSubscriptions(id)) > 0) {
+    if ((await repo.countSubscriptions(id)) > 0 || (await repo.countCharges(id)) > 0) {
     throw new AppError(409, 'Неможливо видалити дитину: є пов\'язані підписки/нарахування');
   }
 
@@ -154,6 +154,7 @@ async function deleteChild(rawId) {
     await repo.remove(id);
   } catch (err) {
     if (err.code === 'P2025') throw new AppError(404, 'Дитину не знайдено');
+    if (err.code === 'P2003') throw new AppError(409, 'Неможливо видалити дитину: є пов\'язані фінансові записи');
     throw err;
   }
 }
