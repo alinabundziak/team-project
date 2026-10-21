@@ -12,6 +12,8 @@ router.use(
 );
 
 router.get("/", controller.getGroups);
+router.get("/occupancy", controller.getGroupsOccupancy);
+
 router.post("/", controller.createGroup);
 router.get("/:id", controller.getGroupById);
 router.patch("/:id", controller.updateGroup);

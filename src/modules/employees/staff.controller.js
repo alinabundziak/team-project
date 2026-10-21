@@ -325,10 +325,75 @@ async function deleteStaff(req, res) {
     }
 }
 
+async function getSalaryEstimates(req, res) {
+    try {
+        const estimates = await service.getSalaryEstimates();
+        return res.status(200).json(estimates);
+    } catch (error) {
+        return handleStaffError(error, res);
+    }
+}
+
+async function getStaffDistributionAnalysis(req, res) {
+    const { groupId, childrenCount } = req.query || {};
+
+    const hasGroupId = groupId !== undefined;
+    const hasChildrenCount = childrenCount !== undefined;
+
+    if (hasGroupId !== hasChildrenCount) {
+        return sendStaffError(
+            res,
+            400,
+            "Для сценарного аналізу передайте groupId і childrenCount разом"
+        );
+    }
+
+    let options = {};
+
+    if (hasGroupId && hasChildrenCount) {
+        const parsedGroupId = Number(groupId);
+        const parsedChildrenCount = Number(childrenCount);
+
+        if (!Number.isInteger(parsedGroupId) || parsedGroupId <= 0) {
+            return sendStaffError(
+                res,
+                400,
+                "groupId повинен бути додатним цілим числом"
+            );
+        }
+
+        if (
+            !Number.isInteger(parsedChildrenCount) ||
+            parsedChildrenCount < 0
+        ) {
+            return sendStaffError(
+                res,
+                400,
+                "childrenCount повинен бути невід'ємним цілим числом"
+            );
+        }
+
+        options = {
+            groupId: parsedGroupId,
+            childrenCount: parsedChildrenCount
+        };
+    }
+
+    try {
+        const analysis = await service.getStaffDistributionAnalysis(options);
+
+        return res.status(200).json(analysis);
+    } catch (error) {
+        return handleStaffError(error, res);
+    }
+}
+
 module.exports = {
     getStaff,
     getStaffById,
     createStaff,
     updateStaff,
-    deleteStaff
+    deleteStaff,
+    getSalaryEstimates,
+    getStaffDistributionAnalysis
 };

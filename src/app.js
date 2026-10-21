@@ -3,6 +3,9 @@ const childrenRoutes = require("./modules/children/children.routes");
 const roomsRoutes = require("./modules/rooms/rooms.routes");
 const staffRoutes = require("./modules/employees/staff.routes");
 const groupsRoutes = require("./modules/groups/groups.routes");
+const optimizationRoutes = require("./modules/optimization/optimization.routes");
+
+const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require('./modules/auth/auth.routes');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -22,13 +25,21 @@ app.use("/rooms", roomsRoutes);
 app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
 
-const userRoutes = require('./modules/users/users.routes');
+app.use("/api/groups", groupsRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/optimization", optimizationRoutes);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);             
+const userRoutes = require("./modules/users/users.routes");
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/_examples', require('./modules/auth/auth.examples.routes'));
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    "/api/_examples",
+    require("./modules/auth/auth.examples.routes")
+  );
 }
 
 app.use(errorHandler);

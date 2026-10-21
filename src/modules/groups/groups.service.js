@@ -125,6 +125,57 @@ async function checkRoomAvailability(roomId, excludeGroupId) {
     }
 }
 
+async function getGroupsOccupancy() {
+    const groups = await prisma.groups.findMany({
+        include: {
+            room: {
+                select: {
+                    id: true,
+                    name: true,
+                    capacity: true
+                }
+            },
+            _count: {
+                select: {
+                    children: true
+                }
+            }
+        },
+        orderBy: {
+            id: "asc"
+        }
+    });
+
+    return groups.map(group => {
+        const childrenCount = group._count.children;
+        const groupCapacity = group.capacity;
+        const roomCapacity = group.room.capacity;
+
+        return {
+            groupId: group.id,
+            groupName: group.name,
+            ageYears: group.target_age,
+            childrenCount,
+            groupCapacity,
+            room: {
+                id: group.room.id,
+                name: group.room.name,
+                capacity: roomCapacity
+            },
+            occupancyPercent: groupCapacity > 0
+                ? Math.round(
+                    childrenCount / groupCapacity * 10000
+                ) / 100
+                : null,
+            exceedsGroupCapacity: childrenCount > groupCapacity,
+            exceedsRoomCapacity: childrenCount > roomCapacity,
+            isOverCapacity:
+                childrenCount > groupCapacity ||
+                childrenCount > roomCapacity
+        };
+    });
+}
+
 async function getGroups() {
     const groups = await prisma.groups.findMany({
         include: groupInclude,
@@ -568,6 +619,7 @@ async function removeStaffFromGroup(groupId, staffId) {
 }
 
 module.exports = {
+    getGroupsOccupancy,
     getGroups,
     getGroupById,
     createGroup,
