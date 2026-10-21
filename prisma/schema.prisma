@@ -22,24 +22,23 @@ model users {
   adjustments   adjustments[]
   employees     employees?
   parents       parents?
-  roles         roles?     @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  adjustments   adjustments[]
+  roles         roles?        @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 }
 
 model employees {
-  id                Int                 @id @default(autoincrement())
-  user_id           Int?                @unique
-  first_name        String              @db.VarChar(100)
-  last_name         String              @db.VarChar(100)
-  phone             String?             @db.VarChar(20)
-  position          String              @db.VarChar(100)
-  subject           String?             @db.VarChar(100)
-  salary            Decimal             @default(40000.00) @db.Decimal(10, 2)
-  users             users?              @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups_assistant  groups[]            @relation("groups_assistant_idToemployees")
-  groups_educator   groups[]            @relation("groups_educator_idToemployees")
-  schedules         schedules[]
-  staff_assignments staff_assignments[]
+  id                 Int                  @id @default(autoincrement())
+  user_id            Int?                 @unique
+  first_name         String               @db.VarChar(100)
+  last_name          String               @db.VarChar(100)
+  phone              String?              @db.VarChar(20)
+  position           String               @db.VarChar(100)
+  subject            String?              @db.VarChar(100)
+  salary             Decimal              @default(40000.00) @db.Decimal(10, 2)
+  users              users?               @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  groups_assistant   groups[]             @relation("groups_assistant_idToemployees")
+  groups_educator    groups[]             @relation("groups_educator_idToemployees")
+  schedules          schedules[]
+  staff_assignments  staff_assignments[]
   teacher_activities teacher_activities[]
 }
 
@@ -92,8 +91,6 @@ model children {
   parents       parents?        @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   payments      payments[]
   subscriptions subscriptions[]
-  charges       charges[]
-  payments      payments[]
 }
 
 model discounts {
@@ -138,7 +135,7 @@ model schedules {
 model staff_assignments {
   employee_id Int
   group_id    Int
-  assigned_at DateTime @default(now()) @db.Timestamp(6)
+  assigned_at DateTime  @default(now()) @db.Timestamp(6)
   employee    employees @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   group       groups    @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
@@ -157,19 +154,19 @@ model rules {
 }
 
 model charges {
-  id               Int           @id @default(autoincrement())
-  child_id         Int
-  period           DateTime      @db.Date
-  base_fee         Decimal       @db.Decimal(10, 2)
-  discount_percent Decimal       @db.Decimal(5, 2)
-  tuition_amount   Decimal       @db.Decimal(10, 2)
-  meal_price_per_day Decimal     @db.Decimal(10, 2)
-  meal_days        Int
-  meal_amount      Decimal       @db.Decimal(10, 2)
-  total_amount     Decimal       @db.Decimal(10, 2)
-  created_at       DateTime?     @default(now()) @db.Timestamp(6)
-  adjustments      adjustments[]
-  children         children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id                 Int           @id @default(autoincrement())
+  child_id           Int
+  period             DateTime      @db.Date
+  base_fee           Decimal       @db.Decimal(10, 2)
+  discount_percent   Decimal       @db.Decimal(5, 2)
+  tuition_amount     Decimal       @db.Decimal(10, 2)
+  meal_price_per_day Decimal       @db.Decimal(10, 2)
+  meal_days          Int
+  meal_amount        Decimal       @db.Decimal(10, 2)
+  total_amount       Decimal       @db.Decimal(10, 2)
+  created_at         DateTime?     @default(now()) @db.Timestamp(6)
+  adjustments        adjustments[]
+  children           children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@unique([child_id, period])
 }
@@ -232,8 +229,8 @@ model subscriptions {
 }
 
 model child_benefits {
-  id          Int     @id @default(autoincrement())
-  child_id    Int
+  id           Int    @id @default(autoincrement())
+  child_id     Int
   benefit_type String @db.VarChar(100)
 }
 
@@ -246,70 +243,3 @@ model pricing_plans {
   id   Int    @id @default(autoincrement())
   name String @db.VarChar(100)
 }
-
-model charges {
-  id                 Int      @id @default(autoincrement())
-  child_id           Int
-  period             DateTime @db.Date
-  base_fee           Decimal  @db.Decimal(10, 2)
-  discount_percent   Decimal  @db.Decimal(5, 2)
-  tuition_amount     Decimal  @db.Decimal(10, 2)
-  meal_price_per_day Decimal  @db.Decimal(10, 2)
-  meal_days          Int
-  meal_amount        Decimal  @db.Decimal(10, 2)
-  total_amount       Decimal  @db.Decimal(10, 2)
-  created_at         DateTime @default(now()) @db.Timestamp(6)
-  children           children @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  adjustments        adjustments[]
-  @@unique([child_id, period])
-}
-
-model payments {
-  id         Int       @id @default(autoincrement())
-  child_id   Int
-  amount     Decimal   @db.Decimal(10, 2)
-  created_at DateTime  @default(now()) @db.Timestamp(6)
-  children   children  @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  refunds    refunds[]
-}
-
-model refunds {
-  id         Int      @id @default(autoincrement())
-  payment_id Int
-  amount     Decimal  @db.Decimal(10, 2)
-  reason     String?  @db.VarChar(255)
-  created_at DateTime @default(now()) @db.Timestamp(6)
-  payments   payments @relation(fields: [payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-}
-
-model tariffs {
-  id         Int      @id @default(autoincrement())
-  code       String   @db.VarChar(30)
-  amount     Decimal  @db.Decimal(10, 2)
-  valid_from DateTime @db.Date
-  created_at DateTime @default(now()) @db.Timestamp(6)
-
-  @@unique([code, valid_from])
-}
-
-model meal_rates {
-  id         Int      @id @default(autoincrement())
-  age        Int
-  daily_rate Decimal  @db.Decimal(10, 2)
-  valid_from DateTime @db.Date
-
-  @@unique([age, valid_from])
-}
-
-model adjustments {
-  id         Int      @id @default(autoincrement())
-  charge_id  Int
-  direction  String   @db.VarChar(10)
-  amount     Decimal  @db.Decimal(10, 2)
-  reason     String   @db.VarChar(255)
-  created_by Int
-  created_at DateTime @default(now()) @db.Timestamp(6)
-  charges    charges  @relation(fields: [charge_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  users      users    @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
-}
-

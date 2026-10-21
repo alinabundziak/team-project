@@ -10,7 +10,7 @@ const prisma = require('../src/config/prisma');
     }
 
     const created = await prisma.discounts.create({
-      data: { id: 1, name: 'Без пільги', percentage: 0 },
+      data: { id: 1, name: 'Без пільги', percent: 0 },
     });
     console.log('Створено:', created);
   } catch (err) {

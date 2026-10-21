@@ -11,12 +11,17 @@ function isSupportedPercent(percent) {
 }
 
 function toDiscountDto(d) {
-  return { id: d.id, name: d.name, percent: new Decimal(d.percentage).toNumber() };
+  return {
+    id: d.id,
+    code: d.code,
+    name: d.description || d.code,
+    percent: new Decimal(d.percent).toNumber(),
+  };
 }
 
 async function listDiscounts() {
   const rows = await repo.findAll();
-  return { data: rows.filter((d) => isSupportedPercent(d.percentage)).map(toDiscountDto) };
+  return { data: rows.filter((d) => isSupportedPercent(d.percent)).map(toDiscountDto) };
 }
 
 module.exports = { listDiscounts, isSupportedPercent, toDiscountDto };

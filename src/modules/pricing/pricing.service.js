@@ -45,7 +45,7 @@ async function estimateTuition(rawChildId, query = {}) {
   if (!child) throw new AppError(404, 'Дитину не знайдено');
 
   const discount = await resolveDiscount(child, overrideId);
-  const percent = discount ? new Decimal(discount.percentage) : new Decimal(0);
+  const percent = discount ? new Decimal(discount.percent) : new Decimal(0);
 
   if (!isSupportedPercent(percent)) {
     throw new AppError(409, `Непідтримуваний розмір знижки: ${percent.toString()}%. Дозволено: ${cfg.ALLOWED_DISCOUNT_PERCENTS.join(', ')}`);
@@ -60,7 +60,7 @@ async function estimateTuition(rawChildId, query = {}) {
 
   return {
     childId,
-    discount: discount ? { id: discount.id, name: discount.name, percent: percent.toNumber() } : null,
+    discount: discount ? { id: discount.id, name: discount.description, percent: percent.toNumber() } : null,
     calculation,
   };
 }
@@ -98,7 +98,7 @@ async function calculateMealAmount(age, days, periodStart) {
 
 async function getChildDiscountPercent(child) {
   const discount = await resolveDiscount(child, undefined);
-  const percent = discount ? new Decimal(discount.percentage) : new Decimal(0);
+  const percent = discount ? new Decimal(discount.percent) : new Decimal(0);
   if (!isSupportedPercent(percent)) {
     throw new AppError(409, `Непідтримуваний розмір знижки: ${percent.toString()}%`);
   }
