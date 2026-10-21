@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const childrenRoutes = require("./modules/children/children.routes");
@@ -8,7 +9,6 @@ const optimizationRoutes = require("./modules/optimization/optimization.routes")
 const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
-
 const autoScheduleRoutes = require("../routes/autoScheduleRoutes");
 
 const errorHandler = require("./middleware/errorHandler");
@@ -16,8 +16,6 @@ const errorHandler = require("./middleware/errorHandler");
 const app = express();
 
 app.use(express.json());
-
-app.use('/api/auth', authRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -31,14 +29,21 @@ app.use("/rooms", roomsRoutes);
 app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
 
-app.use("/api/groups", groupsRoutes);
-app.use("/api/payroll", payrollRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/optimization", optimizationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/children", childrenRoutes);
+app.use("/api/parents", require("./modules/parents/parents.routes"));
+
+app.use("/api/groups", groupsRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/optimization", optimizationRoutes);
 
 app.use("/api", autoScheduleRoutes);
+
+app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
+app.use("/api", require("./modules/pricing/pricing.routes"));
+app.use("/api/tariffs", require("./modules/tariffs/tariffs.routes"));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(
@@ -46,26 +51,6 @@ if (process.env.NODE_ENV !== "production") {
     require("./modules/auth/auth.examples.routes")
   );
 }
-
-app.use(errorHandler);
-
-const userRoutes = require('./modules/users/users.routes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);             
-
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/_examples', require('./modules/auth/auth.examples.routes'));
-}
-
-app.use('/api/children', require('./modules/children/children.routes'));
-
-app.use('/api/parents', require('./modules/parents/parents.routes'));
-
-app.use('/api/discounts', require('./modules/discounts/discounts.routes'));
-app.use('/api', require('./modules/pricing/pricing.routes'));
-
-app.use('/api/tariffs', require('./modules/tariffs/tariffs.routes'));
 
 app.use(errorHandler);
 
