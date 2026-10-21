@@ -1,13 +1,14 @@
 const express = require("express");
 const childrenRoutes = require("./modules/children/children.routes");
+const roomsRoutes = require("./modules/rooms/rooms.routes");
+const staffRoutes = require("./modules/employees/staff.routes");
+const groupsRoutes = require("./modules/groups/groups.routes");
 const authRoutes = require('./modules/auth/auth.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
 app.use(express.json());
-
-app.use('/api/auth', authRoutes);
 
 app.get("/health", (req, res) => {
     res.status(200).json({
@@ -17,6 +18,9 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/children", childrenRoutes);
+app.use("/rooms", roomsRoutes);
+app.use("/staff", staffRoutes);
+app.use("/groups", groupsRoutes);
 
 const userRoutes = require('./modules/users/users.routes');
 
