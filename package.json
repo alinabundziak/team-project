@@ -12,14 +12,23 @@
     "db:push": "prisma db push",
     "db:validate": "prisma validate",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "create-admin": "node scripts/create-admin.js",
+    "seed-test-users": "node scripts/seed-test-users.js"
   },
   "dependencies": {
-    "@prisma/client": "5.22.0",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "proxyquire": "^2.1.3"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "prisma@5.22.0": true
   },
   "engines": {
     "node": ">=18.18"
