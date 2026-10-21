@@ -9,7 +9,6 @@ const optimizationRoutes = require("./modules/optimization/optimization.routes")
 const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
-// const autoScheduleRoutes = require("../routes/autoScheduleRoutes");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -38,8 +37,6 @@ app.use("/api/groups", groupsRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/optimization", optimizationRoutes);
-
-// app.use("/api", autoScheduleRoutes);
 
 app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
 app.use("/api", require("./modules/pricing/pricing.routes"));
