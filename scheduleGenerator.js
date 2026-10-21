@@ -41,8 +41,10 @@ function checkAvailability(existingSchedules, day, start, end, teacherId, groupI
     if (excludeId && item.id === Number(excludeId)) continue;
     if (item.day_of_week !== day) continue;
 
-    const itemStart = item.start_time.getHours() * 60 + item.start_time.getMinutes();
-    const itemEnd = item.end_time.getHours() * 60 + item.end_time.getMinutes();
+    const startDate = new Date(item.start_time);
+    const endDate = new Date(item.end_time);
+    const itemStart = startDate.getHours() * 60 + startDate.getMinutes();
+    const itemEnd = endDate.getHours() * 60 + endDate.getMinutes();
 
     if (isOverlapping(start, end, itemStart, itemEnd)) {
       if (teacherId && item.teacher_id === Number(teacherId)) return { available: false, reason: `Викладач (ID: ${teacherId}) вже має заняття` };
@@ -153,6 +155,8 @@ module.exports = {
   findAlternativeSlots,
   validateAgeBalance,
   checkAvailability,
+  isReservedSlot,
+  isOverlapping,
   timeToMinutes,
   minutesToDate,
   DAY_START,
