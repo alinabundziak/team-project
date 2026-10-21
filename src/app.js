@@ -9,7 +9,7 @@ const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
 
-const autoScheduleRoutes = require("../routes/autoScheduleRoutes");
+const autoScheduleRoutes = require("../controllers/autoScheduleRoutes");
 
 const errorHandler = require("./middleware/errorHandler");
 
