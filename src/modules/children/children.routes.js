@@ -1,8 +1,24 @@
-const express = require("express");
+const express = require('express');
+const controller = require('./children.controller');
+const asyncHandler = require('../../utils/asyncHandler');
+const authenticate = require('../../middleware/authenticate');
+const authorizeRoles = require('../../middleware/authorizeRoles');
+const { ROLES } = require('../../config/roles');
+const childParents = require('../childParents/childParents.controller');
+
 const router = express.Router();
 
-const controller = require("./children.controller");
+router.use(authenticate);
 
-router.get("/", controller.getChildren);
+const staff = authorizeRoles(ROLES.ADMIN, ROLES.MANAGER);
+const staffOrParent = authorizeRoles(ROLES.ADMIN, ROLES.MANAGER, ROLES.PARENT);
+
+router.get('/', staff, asyncHandler(controller.list));
+router.post('/', staff, asyncHandler(controller.create));
+router.get('/:id', staffOrParent, asyncHandler(controller.getOne));
+router.patch('/:id', staff, asyncHandler(controller.update));
+router.delete('/:id', staff, asyncHandler(controller.remove));
+router.post('/:id/parents', staff, asyncHandler(childParents.link));
+router.delete('/:id/parents/:parentId', staff, asyncHandler(childParents.unlink));
 
 module.exports = router;
