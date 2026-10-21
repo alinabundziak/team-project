@@ -7,7 +7,6 @@ const parseId = require('../../utils/parseId');
 const cfg = require('../../config/pricing');
 const { calculateTuition } = require('./tuition.calculator');
 const pricingRepo = require('./pricing.repository');
-const { calculateAge } = require('../../utils/age');
 const { getTariffAmount } = require('../tariffs/tariffs.service');
 const { mealPriceForDays } = require('./meal.calculator');
 const { calculateAge, todayUtc, startOfMonthUtc, formatDateOnly } = require('../../utils/age');
