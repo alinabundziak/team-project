@@ -102,6 +102,7 @@ model children {
   subscriptions subscriptions[]
   child_benefits child_benefits[]
   payments       payments[]
+  charges        charges[]
 }
 
 model discounts {
@@ -305,4 +306,13 @@ model payments {
   created_at         DateTime      @default(now()) @db.Timestamp(6)
 
   children           children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
+}
+
+model charges {
+  id         Int      @id @default(autoincrement())
+  child_id   Int
+  amount     Decimal  @db.Decimal(10, 2)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+
+  children   children @relation(fields: [child_id], references: [id], onDelete: Cascade)
 }

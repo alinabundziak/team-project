@@ -1,85 +1,81 @@
 const { PrismaClient } = require('@prisma/client');
+const Decimal = require('decimal.js');
 const prisma = new PrismaClient();
 
 class AnalyticsService {
   async getFinancialSummary(startDate, endDate) {
     const dateFilter = {};
     if (startDate && endDate) {
-      dateFilter.createdAt = {
+      dateFilter.created_at = {
         gte: new Date(startDate),
         lte: new Date(endDate),
       };
     }
 
-    const chargesAggregate = await prisma.charge.aggregate({
+    const chargesAggregate = await prisma.charges.aggregate({
       _sum: { amount: true },
       where: dateFilter,
     });
-    const chargesTotal = chargesAggregate._sum.amount || 0;
+    const chargesTotal = new Decimal(chargesAggregate._sum.amount?.toString() || 0);
 
-    const paymentsAggregate = await prisma.payment.aggregate({
-      _sum: { amount: true },
+    const paymentsAggregate = await prisma.payments.aggregate({
+      _sum: { total_amount: true },
       where: dateFilter,
     });
-    const paymentsTotal = paymentsAggregate._sum.amount || 0;
+    const paymentsTotal = new Decimal(paymentsAggregate._sum.total_amount?.toString() || 0);
 
-    let refundsTotal = 0;
-    if (prisma.refund) {
-      const refundsAggregate = await prisma.refund.aggregate({
-        _sum: { amount: true },
-        where: dateFilter,
-      });
-      refundsTotal = refundsAggregate._sum.amount || 0;
-    }
+    let refundsTotal = new Decimal(0);
 
-    const actualRevenue = paymentsTotal - refundsTotal;
-    const totalDebt = Math.max(0, chargesTotal - actualRevenue);
+    const actualRevenue = paymentsTotal.sub(refundsTotal);
+    const debtCalc = chargesTotal.sub(actualRevenue);
+    const totalDebt = debtCalc.isNegative() ? new Decimal(0) : debtCalc;
 
-    const groups = await prisma.group.findMany({
+    const groups = await prisma.groups.findMany({
       include: { children: true },
     });
     const groupsCount = groups.length;
 
-    let groupSalariesTotal = 0;
+    let groupSalariesTotal = new Decimal(0);
     for (const group of groups) {
       const N = group.children ? group.children.length : 0;
-      const teacherSalary = 2000 * N + 500 * Math.max(0, N - 12);
-      const assistantSalary = 20000;
-      groupSalariesTotal += (teacherSalary + assistantSalary);
+      const teacherSalary = new Decimal(2000).mul(N).add(new Decimal(500).mul(Math.max(0, N - 12)));
+      const assistantSalary = new Decimal(20000);
+      groupSalariesTotal = groupSalariesTotal.add(teacherSalary).add(assistantSalary);
     }
 
-    const teachersCount = await prisma.employee.count({
-      where: { role: 'TEACHER' },
-    });
-    const teachersSalaries = teachersCount * 40000;
-    const managerSalary = 80000;
+    const teachersCount = await prisma.employees.count({
+      where: { position: 'TEACHER' },
+    }).catch(() => 0);
 
-    const totalStaffSalaries = groupSalariesTotal + teachersSalaries + managerSalary;
-    const rentExpenses = 50000 * groupsCount;
-    const totalExpenses = totalStaffSalaries + rentExpenses;
+    const teachersSalaries = new Decimal(teachersCount).mul(40000);
+    const managerSalary = new Decimal(80000);
 
-    const financialResult = actualRevenue - totalExpenses;
+    const totalStaffSalaries = groupSalariesTotal.add(teachersSalaries).add(managerSalary);
+    const rentExpenses = new Decimal(50000).mul(groupsCount);
+    const totalExpenses = totalStaffSalaries.add(rentExpenses);
+
+    const financialResult = actualRevenue.sub(totalExpenses);
 
     return {
       period: {
         startDate: startDate || 'всі дати',
         endDate: endDate || 'всі дати',
       },
-      chargesTotal: Number(chargesTotal.toFixed(2)),
-      actualRevenue: Number(actualRevenue.toFixed(2)),
-      totalDebt: Number(totalDebt.toFixed(2)),
+      chargesTotal: chargesTotal.toNumber(),
+      actualRevenue: actualRevenue.toNumber(),
+      totalDebt: totalDebt.toNumber(),
       expenses: {
-        isEstimated: false,
-        staffSalaries: Number(totalStaffSalaries.toFixed(2)),
-        rentExpenses: Number(rentExpenses.toFixed(2)),
-        totalExpenses: Number(totalExpenses.toFixed(2)),
+        isEstimated: true, 
+        staffSalaries: totalStaffSalaries.toNumber(),
+        rentExpenses: rentExpenses.toNumber(),
+        totalExpenses: totalExpenses.toNumber(),
       },
-      financialResult: Number(financialResult.toFixed(2)),
+      financialResult: financialResult.toNumber(),
     };
   }
 
   async getDebtsReport() {
-    const children = await prisma.child.findMany({
+    const children = await prisma.children.findMany({
       include: {
         charges: true,
         payments: true,
@@ -87,114 +83,128 @@ class AnalyticsService {
     });
 
     const debtors = [];
-    let totalOverdueAmount = 0;
+    let totalOverdueAmount = new Decimal(0);
 
     for (const child of children) {
-      const totalCharged = child.charges.reduce((acc, c) => acc + c.amount, 0);
-      const totalPaid = child.payments.reduce((acc, p) => acc + p.amount, 0);
-      const debt = totalCharged - totalPaid;
+      const totalCharged = child.charges.reduce(
+        (acc, c) => acc.add(new Decimal(c.amount?.toString() || 0)),
+        new Decimal(0)
+      );
+      const totalPaid = child.payments.reduce(
+        (acc, p) => acc.add(new Decimal(p.total_amount?.toString() || 0)),
+        new Decimal(0)
+      );
+      const debt = totalCharged.sub(totalPaid);
 
-      if (debt > 0) {
+      if (debt.isPositive() && !debt.isZero()) {
         debtors.push({
           childId: child.id,
-          childName: `${child.firstName} ${child.lastName}`,
-          debtAmount: Number(debt.toFixed(2)),
+          childName: `${child.first_name || ''} ${child.last_name || ''}`.trim(),
+          debtAmount: debt.toNumber(),
           chargesCount: child.charges.length,
           lastPaymentDate: child.payments.length
-            ? child.payments[child.payments.length - 1].createdAt
+            ? child.payments[child.payments.length - 1].created_at
             : null,
         });
-        totalOverdueAmount += debt;
+        totalOverdueAmount = totalOverdueAmount.add(debt);
       }
     }
 
     return {
       totalDebtorsCount: debtors.length,
-      totalOverdueAmount: Number(totalOverdueAmount.toFixed(2)),
+      totalOverdueAmount: totalOverdueAmount.toNumber(),
       debtors,
     };
   }
 
   async getRevenueForecast() {
-    const children = await prisma.child.findMany({
+    const children = await prisma.children.findMany({
       include: {
-        discount: true,
+        discounts: true,
       },
     });
 
-    let expectedTuitionRevenue = 0;
-    let expectedMealsRevenue = 0;
+    let expectedTuitionRevenue = new Decimal(0);
+    let expectedMealsRevenue = new Decimal(0);
 
     const WORK_DAYS_PER_MONTH = 22;
 
     for (const child of children) {
-      const discountVal = child.discount ? child.discount.percentage / 100 : 0;
-      const childTuition = 15000 * (1 - discountVal);
-      expectedTuitionRevenue += childTuition;
+      const discountPct = child.discounts ? new Decimal(child.discounts.percentage?.toString() || 0) : new Decimal(0);
+      const discountMultiplier = new Decimal(1).sub(discountPct.div(100));
+      const childTuition = new Decimal(15000).mul(discountMultiplier);
+      expectedTuitionRevenue = expectedTuitionRevenue.add(childTuition);
 
-      const age = child.age || 3;
-      const dailyMealFee = 300 + 100 * Math.min(Math.max(age - 2, 0), 3);
-      expectedMealsRevenue += dailyMealFee * WORK_DAYS_PER_MONTH;
+      const dailyMealFee = new Decimal(400); 
+      expectedMealsRevenue = expectedMealsRevenue.add(dailyMealFee.mul(WORK_DAYS_PER_MONTH));
     }
 
-    const expectedTotalRevenue = expectedTuitionRevenue + expectedMealsRevenue;
+    const expectedTotalRevenue = expectedTuitionRevenue.add(expectedMealsRevenue);
 
     return {
       activeChildrenCount: children.length,
-      expectedTuitionRevenue: Number(expectedTuitionRevenue.toFixed(2)),
-      expectedMealsRevenue: Number(expectedMealsRevenue.toFixed(2)),
-      expectedTotalRevenue: Number(expectedTotalRevenue.toFixed(2)),
+      expectedTuitionRevenue: expectedTuitionRevenue.toNumber(),
+      expectedMealsRevenue: expectedMealsRevenue.toNumber(),
+      expectedTotalRevenue: expectedTotalRevenue.toNumber(),
     };
   }
 
-  async calculateScenario(scenarioParams) {
+  async calculateScenario(scenarioParams = {}) {
     const {
       targetChildrenPerGroup = 12,
       tariffPriceChangePercent = 0,
       discountChangePercent = 0,
     } = scenarioParams;
 
-    const groupsCount = await prisma.group.count();
+    const groupsCount = await prisma.groups.count();
     const effectiveGroupsCount = groupsCount || 1;
     const simulatedChildrenCount = targetChildrenPerGroup * effectiveGroupsCount;
 
     const currentForecast = await this.getRevenueForecast();
     const currentSummary = await this.getFinancialSummary();
 
-    const baseTuitionPerChild = 15000 * (1 + tariffPriceChangePercent / 100);
-    const avgDiscount = (0.1 + discountChangePercent / 100);
-    const simTuitionTotal = simulatedChildrenCount * baseTuitionPerChild * (1 - Math.max(0, avgDiscount));
-    const simMealsTotal = simulatedChildrenCount * 400 * 22;
-    const simulatedRevenue = simTuitionTotal + simMealsTotal;
+    const baseTuitionPerChild = new Decimal(15000).mul(new Decimal(1).add(new Decimal(tariffPriceChangePercent).div(100)));
+    const avgDiscount = new Decimal(0.1).add(new Decimal(discountChangePercent).div(100));
+    const effectiveDiscount = Decimal.max(0, avgDiscount);
+    
+    const simTuitionTotal = new Decimal(simulatedChildrenCount)
+      .mul(baseTuitionPerChild)
+      .mul(new Decimal(1).sub(effectiveDiscount));
+      
+    const simMealsTotal = new Decimal(simulatedChildrenCount).mul(400).mul(22);
+    const simulatedRevenue = simTuitionTotal.add(simMealsTotal);
 
     const N = targetChildrenPerGroup;
-    const teacherSalaryPerGroup = 2000 * N + 500 * Math.max(0, N - 12);
-    const assistantSalaryPerGroup = 20000;
-    const simulatedGroupSalaries = (teacherSalaryPerGroup + assistantSalaryPerGroup) * effectiveGroupsCount;
+    const teacherSalaryPerGroup = new Decimal(2000).mul(N).add(new Decimal(500).mul(Math.max(0, N - 12)));
+    const assistantSalaryPerGroup = new Decimal(20000);
+    const simulatedGroupSalaries = teacherSalaryPerGroup.add(assistantSalaryPerGroup).mul(effectiveGroupsCount);
 
-    const simulatedRent = 50000 * effectiveGroupsCount;
-    const simulatedExpenses = simulatedGroupSalaries + simulatedRent + 120000;
+    const simulatedRent = new Decimal(50000).mul(effectiveGroupsCount);
+    const simulatedExpenses = simulatedGroupSalaries.add(simulatedRent).add(120000);
 
-    const simulatedProfit = simulatedRevenue - simulatedExpenses;
+    const simulatedProfit = simulatedRevenue.sub(simulatedExpenses);
+    const baselineRevenue = new Decimal(currentForecast.expectedTotalRevenue);
+    const baselineExpenses = new Decimal(currentSummary.expenses.totalExpenses);
+    const baselineProfit = baselineRevenue.sub(baselineExpenses);
 
     return {
       baseline: {
         childrenCount: currentForecast.activeChildrenCount,
-        expectedRevenue: currentForecast.expectedTotalRevenue,
-        expectedExpenses: currentSummary.expenses.totalExpenses,
-        profit: Number((currentForecast.expectedTotalRevenue - currentSummary.expenses.totalExpenses).toFixed(2)),
+        expectedRevenue: baselineRevenue.toNumber(),
+        expectedExpenses: baselineExpenses.toNumber(),
+        profit: baselineProfit.toNumber(),
       },
       scenario: {
         simulatedChildrenCount,
         targetChildrenPerGroup,
-        simulatedRevenue: Number(simulatedRevenue.toFixed(2)),
-        simulatedExpenses: Number(simulatedExpenses.toFixed(2)),
-        simulatedProfit: Number(simulatedProfit.toFixed(2)),
+        simulatedRevenue: simulatedRevenue.toNumber(),
+        simulatedExpenses: simulatedExpenses.toNumber(),
+        simulatedProfit: simulatedProfit.toNumber(),
       },
       diff: {
-        revenueDelta: Number((simulatedRevenue - currentForecast.expectedTotalRevenue).toFixed(2)),
-        expensesDelta: Number((simulatedExpenses - currentSummary.expenses.totalExpenses).toFixed(2)),
-        profitDelta: Number((simulatedProfit - (currentForecast.expectedTotalRevenue - currentSummary.expenses.totalExpenses)).toFixed(2)),
+        revenueDelta: simulatedRevenue.sub(baselineRevenue).toNumber(),
+        expensesDelta: simulatedExpenses.sub(baselineExpenses).toNumber(),
+        profitDelta: simulatedProfit.sub(baselineProfit).toNumber(),
       },
     };
   }
