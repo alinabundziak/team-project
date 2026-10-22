@@ -2,6 +2,8 @@
 const express = require("express");
 
 const childrenRoutes = require("./modules/children/children.routes");
+const pricingRoutes = require("./modules/pricing/pricing.routes");
+const analyticsRouter = require("./modules/analytics/analytics.routes");
 const roomsRoutes = require("./modules/rooms/rooms.routes");
 const staffRoutes = require("./modules/employees/staff.routes");
 const groupsRoutes = require("./modules/groups/groups.routes");
@@ -25,6 +27,8 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/children", childrenRoutes);
+app.use("/api", pricingRoutes);
+app.use("/analytics", analyticsRouter);
 app.use("/rooms", roomsRoutes);
 app.use("/staff", staffRoutes);
 app.use("/groups", groupsRoutes);
@@ -38,11 +42,9 @@ app.use("/api/groups", groupsRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/optimization", optimizationRoutes);
-
 app.use("/api", autoScheduleRoutes);
 
 app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
-app.use("/api", require("./modules/pricing/pricing.routes"));
 app.use("/api/tariffs", require("./modules/tariffs/tariffs.routes"));
 
 if (process.env.NODE_ENV !== "production") {
