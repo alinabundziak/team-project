@@ -5,9 +5,9 @@ const router = express.Router();
 const analyticsController = require('./analytics.controller');
 const authenticate = require('../../middleware/authenticate');
 const authorizeRoles = require('../../middleware/authorizeRoles');
-const { ROLES } = require('../../config/roles');
 
-router.use(authenticate, authorizeRoles(ROLES.ADMIN));
+router.use(authenticate);
+router.use(authorizeRoles('ADMIN', 'FINANCIER'));
 
 router.get('/financial-summary', analyticsController.getFinancialSummary);
 router.get('/debts', analyticsController.getDebts);

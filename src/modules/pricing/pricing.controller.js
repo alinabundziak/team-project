@@ -2,9 +2,31 @@
 const { PricingService } = require('./pricing.service');
 const service = require('./pricing.service');
 
-const handleError = (res, error, fallbackMsg) => {
-    const status = [400, 401, 403, 404, 409].includes(error?.status) ? error.status : 400;
-    return res.status(status).json({ error: error?.message || fallbackMsg });
+const handleError = (res, error, fallbackMsg = 'Internal Server Error') => {
+  console.error('[PricingController Error]:', error);
+
+  if (error?.status && [400, 401, 403, 404, 409, 422].includes(error.status)) {
+    return res.status(error.status).json({
+      error: error.message || fallbackMsg,
+    });
+  }
+
+  if (error?.code === 'P2025') {
+    return res.status(404).json({
+      error: 'The requested resource was not found',
+    });
+  }
+
+  if (error?.name === 'ValidationError' || error?.name === 'ZodError') {
+    return res.status(400).json({
+      error: 'Input data validation error',
+      details: error.errors || error.message,
+    });
+  }
+
+  return res.status(500).json({
+    error: fallbackMsg,
+  });
 };
 
 const createPricingPlan = async (req, res) => {
