@@ -20,7 +20,7 @@ class AnalyticsService {
             _sum: { total_amount: true },
             where: dateFilter,
           });
-          chargesTotal = new Decimal(res?._sum?.amount?.toString() || 0);
+          chargesTotal = new Decimal(res?._sum?.total_amount?.toString() || 0);
         }
       } catch (e) {
         chargesTotal = new Decimal(0);
