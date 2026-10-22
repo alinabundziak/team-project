@@ -1,50 +1,56 @@
-const { Router } = require('express');
-const ctrl = require('./pricing.controller');
 
-const router = Router();
+const express = require('express');
+const controller = require('./pricing.controller');
+const asyncHandler = require('../../utils/asyncHandler');
+const authenticate = require('../../middleware/authenticate');
+const authorizeRoles = require('../../middleware/authorizeRoles');
+const { ROLES } = require('../../config/roles');
 
-const authorize = (allowedRoles = []) => {
-  return (req, res, next) => {
-    if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized: Authentication required' });
-    }
+const charges = require('../charges/charges.controller');
+const payments = require('../payments/payments.controller');
+const refunds = require('../refunds/refunds.controller');
+const adjustments = require('../adjustments/adjustments.controller');
 
-    if (req.user.role === 'MANAGER') {
-        return res.status(403).json({ error: 'Forbidden: Managers have no access to financial routes' });
-    }
+const router = express.Router();
 
-    if (!allowedRoles.includes(req.user.role)) {
-        return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
-    }
-    
-    
-    next();
-  };
-};
+const adminOnly = [authenticate, authorizeRoles(ROLES.ADMIN)];
 
-router.get('/pricing-plans', authorize(['ADMIN']), ctrl.getPricingPlans);
-router.post('/pricing-plans', authorize(['ADMIN']), ctrl.createPricingPlan);
-router.patch('/pricing-plans/:id', authorize(['ADMIN']), ctrl.updatePricingPlan);
-router.delete('/pricing-plans/:id', authorize(['ADMIN']), ctrl.deletePricingPlan);
+router.get('/children/:childId/tuition-estimate', ...adminOnly, asyncHandler(controller.tuitionEstimate));
+router.get('/children/:childId/meal-estimate', ...adminOnly, asyncHandler(controller.mealEstimate));
 
-router.get('/meal-rates', authorize(['ADMIN']), ctrl.getMealRates);
+router.get('/children/:childId/charges', ...adminOnly, asyncHandler(charges.list));
+router.post('/children/:childId/charges', ...adminOnly, asyncHandler(charges.create));
+router.get('/children/:childId/balance', ...adminOnly, asyncHandler(charges.balance));
 
-router.get('/benefits', authorize(['ADMIN']), ctrl.getBenefits);
-router.post('/benefits', authorize(['ADMIN']), ctrl.createBenefit);
-router.post('/children/:id/benefits', authorize(['ADMIN']), ctrl.assignBenefit);
-router.delete('/children/:id/benefits/:benefitId', authorize(['ADMIN']), ctrl.removeChildBenefit);
+router.post('/children/:childId/payments', ...adminOnly, asyncHandler(payments.create));
+router.post('/children/:childId/refunds', ...adminOnly, asyncHandler(refunds.create));
 
-router.post('/pricing/calculate', authorize(['ADMIN']), ctrl.calculatePrice);
+router.get('/children/:childId/financial-history', ...adminOnly, asyncHandler(charges.history));
+router.post('/children/:childId/adjustments', ...adminOnly, asyncHandler(adjustments.create));
 
-router.get('/payments', authorize(['ADMIN', 'PARENT']), ctrl.getPayments);
-router.get('/payments/:id', authorize(['ADMIN', 'PARENT']), ctrl.getPaymentById);
-router.post('/payments', authorize(['ADMIN']), ctrl.createPayment);
-router.patch('/payments/:id', authorize(['ADMIN']), ctrl.updatePayment);
-router.delete('/payments/:id', authorize(['ADMIN']), ctrl.deletePayment);
+router.get('/pricing-plans', ...adminOnly, asyncHandler(controller.getPricingPlans));
+router.post('/pricing-plans', ...adminOnly, asyncHandler(controller.createPricingPlan));
+router.patch('/pricing-plans/:id', ...adminOnly, asyncHandler(controller.updatePricingPlan));
+router.delete('/pricing-plans/:id', ...adminOnly, asyncHandler(controller.deletePricingPlan));
 
-router.get('/cost-rules', authorize(['ADMIN']), ctrl.getCostRules);
-router.post('/cost-rules', authorize(['ADMIN']), ctrl.createCostRule);
-router.patch('/cost-rules/:id', authorize(['ADMIN']), ctrl.updateCostRule);
-router.delete('/cost-rules/:id', authorize(['ADMIN']), ctrl.deleteCostRule);
+router.get('/meal-rates', ...adminOnly, asyncHandler(controller.getMealRates));
+
+router.get('/benefits', ...adminOnly, asyncHandler(controller.getBenefits));
+router.post('/benefits', ...adminOnly, asyncHandler(controller.createBenefit));
+router.post('/children/:id/benefits', ...adminOnly, asyncHandler(controller.assignBenefit));
+router.delete('/children/:id/benefits/:benefitId', ...adminOnly, asyncHandler(controller.removeChildBenefit));
+
+router.post('/pricing/calculate', ...adminOnly, asyncHandler(controller.calculatePrice));
+
+router.get('/payments', ...adminOnly, asyncHandler(controller.getPayments));
+router.get('/payments/:id', ...adminOnly, asyncHandler(controller.getPaymentById));
+router.post('/payments', ...adminOnly, asyncHandler(controller.createPayment));
+router.patch('/payments/:id', ...adminOnly, asyncHandler(controller.updatePayment));
+router.delete('/payments/:id', ...adminOnly, asyncHandler(controller.deletePayment));
+
+router.get('/cost-rules', ...adminOnly, asyncHandler(controller.getCostRules));
+router.post('/cost-rules', ...adminOnly, asyncHandler(controller.createCostRule));
+router.patch('/cost-rules/:id', ...adminOnly, asyncHandler(controller.updateCostRule));
+router.delete('/cost-rules/:id', ...adminOnly, asyncHandler(controller.deleteCostRule));
 
 module.exports = router;

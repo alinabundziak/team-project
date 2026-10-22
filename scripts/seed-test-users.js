@@ -12,6 +12,7 @@ const ACCOUNTS = [
   { email: 'teacher.test@example.com', role: 'TEACHER' },
   { email: 'parent1.test@example.com', role: 'PARENT' },
   { email: 'parent2.test@example.com', role: 'PARENT' },
+  { email: 'parent3.test@example.com', role: 'PARENT' },
 ];
 
 (async () => {

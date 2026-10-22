@@ -111,10 +111,12 @@ exports.confirmSchedule = async (req, res) => {
         return res.status(400).json({ error: `Час початку має бути меншим за час завершення в елементі #${i + 1}` });
       }
 
+      // Перевірка перерв на сон та 3 прийоми їжі
       if (scheduleGen.isReservedSlot(startMins, endMins)) {
         return res.status(409).json({ error: `Конфлікт обмежень: Елемент #${i + 1} припадає на час сну або харчування` });
       }
 
+      // Перевірка конфліктів із записами в БД
       const dbCheck = scheduleGen.checkAvailability(
         existingSchedules,
         Number(item.day_of_week),
@@ -129,6 +131,7 @@ exports.confirmSchedule = async (req, res) => {
         return res.status(409).json({ error: `Конфлікт із БД в елементі #${i + 1}: ${dbCheck.reason}` });
       }
 
+      // Перевірка взаємних конфліктів у самому draft
       const draftCheck = scheduleGen.checkAvailability(
         validatedDraft,
         Number(item.day_of_week),
