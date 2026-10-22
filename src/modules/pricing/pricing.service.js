@@ -280,11 +280,25 @@ class PricingService {
         const updateData = {};
 
         if (data.status) {
+                const validStatuses = ['PENDING', 'PAID', 'PARTIALLY_PAID', 'CANCELLED'];
+            if (!validStatuses.includes(data.status)) {
+                throw new Error(`Некоректний статус платежу: ${data.status}`);
+            }
             updateData.status = data.status;
         }
 
-        if (data.paidAmount) {
-            updateData.paid_amount = new Decimal(data.paidAmount).toFixed(2);
+        if (data.paidAmount !== undefined && data.paidAmount !== null) {
+            const paidNum = Number(data.paidAmount);
+
+            if (isNaN(paidNum) || paidNum < 0) {
+                throw new Error("Сума платежу не може бути від'ємною");
+            }
+
+            updateData.paid_amount = new Decimal(paidNum).toFixed(2);
+
+            if (!data.status) {
+                updateData.status = paidNum === 0 ? 'PENDING' : 'PAID';
+            }
         }
 
         return await prisma.payments.update({

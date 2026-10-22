@@ -13,12 +13,11 @@ class AnalyticsService {
         };
       }
 
-      // 1. Безпечний запит до charges
       let chargesTotal = new Decimal(0);
       try {
         if (prisma.charges) {
           const res = await prisma.charges.aggregate({
-            _sum: { amount: true },
+            _sum: { total_amount: true },
             where: dateFilter,
           });
           chargesTotal = new Decimal(res?._sum?.amount?.toString() || 0);
@@ -27,13 +26,12 @@ class AnalyticsService {
         chargesTotal = new Decimal(0);
       }
 
-      // 2. Безпечний запит до payments
       let paymentsTotal = new Decimal(0);
       try {
         if (prisma.payments) {
           const res = await prisma.payments.aggregate({
             _sum: { paid_amount: true },
-            where: { ...dateFilter, status: 'COMPLETED' },
+            where: { ...dateFilter, status: 'PAID' },
           });
           paymentsTotal = new Decimal(res?._sum?.paid_amount?.toString() || 0);
         }
@@ -41,7 +39,6 @@ class AnalyticsService {
         paymentsTotal = new Decimal(0);
       }
 
-      // 3. Безпечний запит до refunds
       let refundsTotal = new Decimal(0);
       try {
         if (prisma.refunds) {
@@ -59,7 +56,6 @@ class AnalyticsService {
       const debtCalc = chargesTotal.sub(actualRevenue);
       const totalDebt = debtCalc.isNegative() ? new Decimal(0) : debtCalc;
 
-      // 4. Безпечний запит до groups
       let groups = [];
       try {
         if (prisma.groups) {
@@ -78,7 +74,6 @@ class AnalyticsService {
         groupSalariesTotal = groupSalariesTotal.add(teacherSalary).add(assistantSalary);
       }
 
-      // 5. Безпечний запит до employees
       let teachersCount = 0;
       try {
         if (prisma.employees) {
@@ -125,7 +120,7 @@ class AnalyticsService {
         charges: true,
         payments: {
           where: {
-            status: 'COMPLETED', 
+            status: 'PAID',
           },
         },
         refunds: true, 
@@ -135,20 +130,12 @@ class AnalyticsService {
     const debtors = [];
     let totalDebtAmount = new Decimal(0);
     let totalOverdueAmount = new Decimal(0);
-    const currentDate = new Date();
 
     for (const child of children) {
       const totalCharged = child.charges.reduce(
-        (acc, c) => acc.add(new Decimal(c.amount?.toString() || 0)),
+        (acc, c) => acc.add(new Decimal(c.total_amount?.toString() || 0)),
         new Decimal(0)
       );
-
-      const overdueCharged = child.charges
-        .filter((c) => c.due_date && new Date(c.due_date) < currentDate)
-        .reduce(
-          (acc, c) => acc.add(new Decimal(c.amount?.toString() || 0)),
-          new Decimal(0)
-        );
 
       const totalPaid = child.payments.reduce(
         (acc, p) => acc.add(new Decimal(p.paid_amount?.toString() || 0)),
@@ -165,8 +152,7 @@ class AnalyticsService {
       const debt = totalCharged.sub(netPaid);
 
       if (debt.isPositive() && !debt.isZero()) {
-        const overdueDebtCalc = overdueCharged.sub(netPaid);
-        const overdueDebt = overdueDebtCalc.isPositive() ? overdueDebtCalc : new Decimal(0);
+        const overdueDebt = debt; 
 
         debtors.push({
           childId: child.id,
