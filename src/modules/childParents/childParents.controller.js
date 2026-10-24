@@ -1,13 +1,13 @@
 const service = require('./childParents.service');
+const { sendCreated, sendNoContent } = require('../../utils/respond');
 
 async function link(req, res) {
-  const result = await service.linkParent(req.params.id, req.body || {});
-  res.status(201).json(result);
+  sendCreated(res, await service.linkParent(req.params.id, req.body));
 }
 
 async function unlink(req, res) {
   await service.unlinkParent(req.params.id, req.params.parentId);
-  res.status(204).send();
+  sendNoContent(res);
 }
 
 module.exports = { link, unlink };

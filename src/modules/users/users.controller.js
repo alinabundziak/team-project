@@ -1,14 +1,13 @@
 const usersService = require('./users.service');
+const { sendOk, sendCreated } = require('../../utils/respond');
 
 async function create(req, res) {
-  const { email, password, role } = req.body || {};
-  const user = await usersService.createUser({ email, password, role });
-  res.status(201).json(user);
+  const { email, password, role } = req.body;
+  sendCreated(res, await usersService.createUser({ email, password, role }));
 }
 
 async function getMe(req, res) {
-  const user = await usersService.getMe(req.user.id);
-  res.status(200).json(user);
+  sendOk(res, await usersService.getMe(req.user.id));
 }
 
 module.exports = { create, getMe };
