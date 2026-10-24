@@ -1,4 +1,3 @@
-
 const { PricingService } = require('./pricing.service');
 const service = require('./pricing.service');
 
@@ -59,7 +58,7 @@ const updatePricingPlan = async (req, res) => {
 const deletePricingPlan = async (req, res) => {
     try {
         await PricingService.deletePricingPlan(req.params.id);
-        return res.status(200).json({ message: 'Pricing plan deleted successfully' });
+        return res.status(204).send();
     } catch (e) {
         return handleError(res, e, 'Error deleting pricing plan');
     }
@@ -105,7 +104,7 @@ const assignBenefit = async (req, res) => {
 const removeChildBenefit = async (req, res) => {
     try {
         await PricingService.removeChildBenefit(req.params.id, req.params.benefitId);
-        return res.status(200).json({ message: 'Child benefit removed successfully' });
+        return res.status(204).send();
     } catch (e) {
         return handleError(res, e, 'Error removing child benefit');
     }
@@ -159,7 +158,7 @@ const updatePayment = async (req, res) => {
 const deletePayment = async (req, res) => {
     try {
         await PricingService.deletePayment(req.params.id);
-        return res.status(200).json({ message: 'Payment deleted successfully' });
+        return res.status(204).send();
     } catch (e) {
         return handleError(res, e, 'Error deleting payment');
     }
@@ -195,22 +194,28 @@ const updateCostRule = async (req, res) => {
 const deleteCostRule = async (req, res) => {
     try {
         await PricingService.deleteCostRule(req.params.id);
-        return res.status(200).json({ message: 'Cost rule deleted successfully' });
+        return res.status(204).send();
     } catch (e) {
         return handleError(res, e, 'Error deleting cost rule');
     }
 };
 
 async function tuitionEstimate(req, res) {
-    res.status(200).json(
-        await service.estimateTuition(req.params.childId, req.query)
-    );
+    try {
+        const result = await service.estimateTuition(req.params.childId, req.query);
+        return res.status(200).json(result);
+    } catch (e) {
+        return handleError(res, e, 'Error estimating tuition');
+    }
 }
 
 async function mealEstimate(req, res) {
-    res.status(200).json(
-        await service.estimateMeals(req.params.childId, req.query)
-    );
+    try {
+        const result = await service.estimateMeals(req.params.childId, req.query);
+        return res.status(200).json(result);
+    } catch (e) {
+        return handleError(res, e, 'Error estimating meals');
+    }
 }
 
 module.exports = {

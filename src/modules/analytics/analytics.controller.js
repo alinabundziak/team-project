@@ -37,3 +37,12 @@ exports.runScenario = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getStaffOptimization = async (req, res, next) => {
+  try {
+    const result = await analyticsService.getStaffOptimizationRecommendations();
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};

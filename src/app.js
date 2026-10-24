@@ -26,26 +26,20 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/children", childrenRoutes);
-app.use("/api", pricingRoutes);
-app.use("/analytics", analyticsRouter);
-app.use("/rooms", roomsRoutes);
-app.use("/staff", staffRoutes);
-app.use("/groups", groupsRoutes);
-
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/children", childrenRoutes);
 app.use("/api/parents", require("./modules/parents/parents.routes"));
-
 app.use("/api/groups", groupsRoutes);
+app.use("/api/rooms", roomsRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/optimization", optimizationRoutes);
-app.use("/api", autoScheduleRoutes);
-
+app.use("/api/pricing", pricingRoutes);
+app.use("/api/analytics", analyticsRouter);
 app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
 app.use("/api/tariffs", require("./modules/tariffs/tariffs.routes"));
+app.use("/api", autoScheduleRoutes);
 
 if (process.env.NODE_ENV !== "production") {
   app.use(

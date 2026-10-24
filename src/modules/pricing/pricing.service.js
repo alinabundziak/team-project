@@ -1,6 +1,13 @@
 const prisma = require('../../config/prisma');
 const Decimal = require('decimal.js');
 
+const MEAL_RATES_BY_AGE = {
+    2: 300,
+    3: 400,
+    4: 500,
+    5: 600
+};
+
 class PricingService {
     static async createPricingPlan(data) {
         if (!data.amount || new Decimal(data.amount).lte(0)) {
@@ -43,7 +50,8 @@ class PricingService {
     }
 
     static async getMealRates() {
-        return await prisma.meal_rates.findMany({ orderBy: { age: 'asc' } });
+        const rates = await prisma.meal_rates.findMany({ orderBy: { age: 'asc' } });
+        return rates.length > 0 ? rates : MEAL_RATES_BY_AGE;
     }
 
     static async getBenefits() {
@@ -161,47 +169,26 @@ class PricingService {
             }
         }
 
-        const months = isAnnual ? 12 : 1;
-        const tuitionAfterBenefit = baseTuition.mul(
-            new Decimal(1).sub(benefitPercent.div(100))
-        );
+        const selectedPeriod = isAnnual ? 'ANNUAL' : 'MONTHLY';
+        const tuitionCalc = calculateTuition({
+            baseFee: baseTuition,
+            discountPercent: benefitPercent,
+            period: selectedPeriod
+        });
 
-        const annualDiscountPercent = isAnnual
-            ? new Decimal(12)
-            : new Decimal(0);
-
-        const annualMultiplier = new Decimal(1).sub(
-            annualDiscountPercent.div(100)
-        );
-
-        const totalTuition = tuitionAfterBenefit.mul(months).mul(annualMultiplier);
-
-        const today = new Date();
-        const birthDate = new Date(child.birth_date);
-
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-
-        const defaultMealRates = {
-            2: 300,
-            3: 400,
-            4: 500,
-            5: 600
-        };
+        const birthDate = new Date(child.date_of_birth || child.birth_date);
+        const age = calculateAge(birthDate);
 
         const dbMealRate = await prisma.meal_rates.findUnique({
             where: { age }
-        });
+        }).catch(() => null);
 
         const pricePerDay = dbMealRate
             ? new Decimal(dbMealRate.daily_rate)
-            : new Decimal(defaultMealRates[age] || 0);
+            : new Decimal(MEAL_RATES_BY_AGE[age] || 0);
 
         const totalMeal = pricePerDay.mul(mealDays);
+        const totalTuition = new Decimal(tuitionCalc.total);
         const totalAmount = totalTuition.add(totalMeal);
 
         return {
@@ -210,10 +197,10 @@ class PricingService {
             period: period || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
             isAnnual,
             mealDays,
-            baseEducationFee: baseTuition.toFixed(2),
-            benefitPercentage: benefitPercent.toFixed(2),
-            annualDiscountPercentage: annualDiscountPercent.toFixed(2),
-            tuitionAmount: totalTuition.toFixed(2),
+            baseEducationFee: tuitionCalc.baseFee,
+            benefitPercentage: tuitionCalc.discountPercent,
+            annualDiscountPercentage: tuitionCalc.annualPaymentDiscountPercent || '0.00',
+            tuitionAmount: tuitionCalc.total,
             mealAmount: totalMeal.toFixed(2),
             totalAmount: totalAmount.toFixed(2)
         };
@@ -280,7 +267,7 @@ class PricingService {
         const updateData = {};
 
         if (data.status) {
-                const validStatuses = ['PENDING', 'PAID', 'PARTIALLY_PAID', 'CANCELLED'];
+            const validStatuses = ['PENDING', 'PAID', 'PARTIALLY_PAID', 'CANCELLED'];
             if (!validStatuses.includes(data.status)) {
                 throw new Error(`Некоректний статус платежу: ${data.status}`);
             }
