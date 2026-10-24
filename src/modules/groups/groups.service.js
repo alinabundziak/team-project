@@ -396,7 +396,12 @@ async function addChildToGroup(groupId, childId) {
         select: {
             id: true,
             target_age: true,
-            capacity: true
+            capacity: true,
+            room: {
+                select: {
+                    capacity: true
+                }
+            }
         }
     });
 
@@ -405,6 +410,14 @@ async function addChildToGroup(groupId, childId) {
             "Групу не знайдено",
             "GROUP_NOT_FOUND",
             404
+        );
+    }
+
+    if (!group.room) {
+        throw createServiceError(
+            "Для групи не призначено базове приміщення",
+            "GROUP_ROOM_REQUIRED",
+            409
         );
     }
 
@@ -457,12 +470,18 @@ async function addChildToGroup(groupId, childId) {
         where: { group_id: groupId }
     });
 
-    if (childrenCount >= group.capacity) {
-        throw createServiceError(
-            "У групі немає вільних місць",
-            "GROUP_FULL",
-            409
-        );
+    const maxCapacity = Math.min(
+        group.capacity ?? 20,
+        group.room.capacity,
+        20
+    );
+
+    if (childrenCount >= maxCapacity) {
+            throw createServiceError(
+                "У групі немає вільних місць",
+                "GROUP_FULL",
+                409
+            );
     }
 
     const updatedChild = await prisma.children.update({
@@ -528,11 +547,11 @@ async function assignStaffToGroup(groupId, staffId) {
     const [group, staff] = await Promise.all([
         prisma.groups.findUnique({
             where: { id: groupId },
-            select: { id: true }
+            select: { id: true, position: true}
         }),
         prisma.employees.findUnique({
             where: { id: staffId },
-            select: { id: true }
+            select: { id: true, position: true}
         })
     ]);
 
@@ -549,6 +568,35 @@ async function assignStaffToGroup(groupId, staffId) {
             "Працівника не знайдено",
             "STAFF_NOT_FOUND",
             404
+        );
+    }
+
+    if (!["EDUCATOR", "ASSISTANT"].includes(staff.position)) {
+        throw createServiceError(
+            "До групи можна призначити лише вихователя або помічника",
+            "STAFF_POSITION_NOT_ALLOWED",
+            409
+        );
+    }
+
+    const assignedToAnotherGroup = await prisma.groups.findFirst({
+        where: {
+            id: { not: groupId },
+            OR: [
+                { educator_id: staffId },
+                { assistant_id: staffId },
+                { staff_assignments: { some: { employee_id: staffId } } },
+                { schedules: { some: { teacher_id: staffId } } }
+            ]
+        },
+        select: { id: true }
+    });
+
+    if (assignedToAnotherGroup) {
+        throw createServiceError(
+            "Працівник уже пов'язаний з іншою групою",
+            "STAFF_ASSIGNED_TO_ANOTHER_GROUP",
+            409
         );
     }
 
