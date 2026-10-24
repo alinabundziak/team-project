@@ -6,8 +6,8 @@ const rules = require('../../config/childrenRules');
 const { validateName } = require('../../utils/validators');
 const { parsePagination } = require('../../utils/pagination');
 const { assertChildAccess, getOwnParentId } = require('./children.access');
+const { normalizeParentNote } = require('./children.validators');
 
-// Єдиний формат дитини назовні (контракт для Dev 2 і Dev 4)
 function toChildDto(child) {
   return {
     id: child.id,
@@ -16,7 +16,8 @@ function toChildDto(child) {
     dateOfBirth: formatDateOnly(child.birth_date),
     age: calculateAge(child.birth_date),
     groupId: child.group_id,
-    parentIds: child.parent_id ? [child.parent_id] : [],
+    parentIds: (child.child_parents || []).map((l) => l.parent_id).sort((a, b) => a - b),
+    parentNote: child.parent_note,
   };
 }
 
@@ -86,7 +87,7 @@ async function listMyChildren(user, query = {}) {
   }
 
   const { page, limit } = parsePagination(query);
-  const where = { parent_id: parentId };
+  const where = { child_parents: { some: { parent_id: parentId } } };
 
   const [items, total] = await Promise.all([
     repo.findMany({ where, skip: (page - 1) * limit, take: limit }),
@@ -159,4 +160,19 @@ async function deleteChild(rawId) {
   }
 }
 
-module.exports = { listChildren, listMyChildren, getChild, createChild, updateChild, deleteChild, toChildDto };
+async function updateParentNote(rawId, input, user) {
+  const id = parseId(rawId);
+  const note = normalizeParentNote(input.parentNote);
+
+  await assertChildAccess(user, id);
+
+  try {
+    const child = await repo.update(id, { parent_note: note });
+    return toChildDto(child);
+  } catch (err) {
+    if (err.code === 'P2025') throw new AppError(404, 'Дитину не знайдено');
+    throw err;
+  }
+}
+
+module.exports = { listChildren, listMyChildren, getChild, createChild, updateChild, deleteChild, toChildDto, updateParentNote};

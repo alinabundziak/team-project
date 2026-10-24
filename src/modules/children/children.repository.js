@@ -1,10 +1,12 @@
 const prisma = require('../../config/prisma');
+const withParents = { child_parents: { select: { parent_id: true } } };
 
 function findMany({ where, skip, take }) {
   return prisma.children.findMany({
     where,
     skip,
     take,
+    include: withParents,
     orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }, { id: 'asc' }],
   });
 }
@@ -14,15 +16,15 @@ function count(where) {
 }
 
 function findById(id) {
-  return prisma.children.findUnique({ where: { id } });
+  return prisma.children.findUnique({ where: { id }, include: withParents });
 }
 
 function create(data) {
-  return prisma.children.create({ data });
+  return prisma.children.create({ data, include: withParents });
 }
 
 function update(id, data) {
-  return prisma.children.update({ where: { id }, data });
+  return prisma.children.update({ where: { id }, data, include: withParents });
 }
 
 function remove(id) {
@@ -37,12 +39,12 @@ function countSubscriptions(childId) {
   return prisma.subscriptions.count({ where: { child_id: childId } });
 }
 
-function findParentByUserId(userId) {
-  return prisma.parents.findUnique({ where: { user_id: userId } });
-}
-
 function countCharges(childId) {
   return prisma.charges.count({ where: { child_id: childId } });
+}
+
+function findParentByUserId(userId) {
+  return prisma.parents.findUnique({ where: { user_id: userId } });
 }
 
 module.exports = {
@@ -54,6 +56,6 @@ module.exports = {
   remove,
   findGroupById,
   countSubscriptions,
-  findParentByUserId,
   countCharges,
+  findParentByUserId,
 };

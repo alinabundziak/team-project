@@ -1,4 +1,4 @@
-const service = require('./childParents.service');
+const service = require('./child_parents.service');
 const { sendCreated, sendNoContent } = require('../../utils/respond');
 
 async function link(req, res) {

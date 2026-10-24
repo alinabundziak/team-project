@@ -3,6 +3,7 @@ const parseId = require('../../utils/parseId');
 const { parsePagination } = require('../../utils/pagination');
 const { parseDateOnly } = require('../../utils/age');
 const { validateName, validateIntId } = require('../../utils/validators');
+const MAX_PARENT_NOTE_LENGTH = 500;
 
 function validateDateFormat(value) {
   if (!parseDateOnly(value)) {
@@ -44,4 +45,16 @@ function validateLinkParent(body) {
   validateIntId(body.parentId, 'parentId');
 }
 
-module.exports = { validateCreateChild, validateUpdateChild, validateListChildren, validateLinkParent };
+function normalizeParentNote(value) {
+  if (value === null) return null;
+  if (typeof value !== 'string' || value.trim().length > MAX_PARENT_NOTE_LENGTH) {
+    throw new AppError(400, `parentNote має бути рядком до ${MAX_PARENT_NOTE_LENGTH} символів або null`);
+  }
+  return value.trim() || null;
+}
+
+function validateParentNote(body) {
+  normalizeParentNote(body.parentNote);
+}
+
+module.exports = { validateCreateChild, validateUpdateChild, validateListChildren, validateLinkParent, validateParentNote, normalizeParentNote};

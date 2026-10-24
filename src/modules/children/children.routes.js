@@ -4,7 +4,7 @@ const asyncHandler = require('../../utils/asyncHandler');
 const authenticate = require('../../middleware/authenticate');
 const authorizeRoles = require('../../middleware/authorizeRoles');
 const { ROLES } = require('../../config/roles');
-const childParents = require('../childParents/childParents.controller');
+const child_parents = require('../child_parents/child_parents.controller');
 const { validate, idParams } = require('../../middleware/validate');
 const v = require('./children.validators');
 
@@ -24,18 +24,24 @@ router.patch(
   validate({ params: idParams('id'), body: v.validateUpdateChild }),
   asyncHandler(controller.update)
 );
+router.patch(
+  '/:id/parent-note',
+  staffOrParent,
+  validate({ params: idParams('id'), body: v.validateParentNote }),
+  asyncHandler(controller.updateParentNote)
+);
 router.delete('/:id', staff, validate({ params: idParams('id') }), asyncHandler(controller.remove));
 router.post(
   '/:id/parents',
   staff,
   validate({ params: idParams('id'), body: v.validateLinkParent }),
-  asyncHandler(childParents.link)
+  asyncHandler(child_parents.link)
 );
 router.delete(
   '/:id/parents/:parentId',
   staff,
   validate({ params: idParams('id', 'parentId') }),
-  asyncHandler(childParents.unlink)
+  asyncHandler(child_parents.unlink)
 );
 
 module.exports = router;
