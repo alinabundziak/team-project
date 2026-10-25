@@ -10,7 +10,7 @@ test("правильно розраховує зарплату виховате�
 
     assert.equal(service.calculateEducatorSalary(10), 20000);
     assert.equal(service.calculateEducatorSalary(12), 24000);
-    assert.equal(service.calculateEducatorSalary(15), 31500);
+    assert.equal(service.calculateEducatorSalary(15), 45000);
 });
 
 test("правильно розраховує фіксовані зарплати", () => {
@@ -21,6 +21,9 @@ test("правильно розраховує фіксовані зарплат�
     assert.equal(service.calculateSalary("ASSISTANT"), 20000);
     assert.equal(service.calculateSalary("TEACHER"), 40000);
     assert.equal(service.calculateSalary("MANAGER"), 80000);
+    assert.equal(service.calculateSalary("ASSISTANT", 12), 20000);
+    assert.equal(service.calculateSalary("ASSISTANT", 13), 23000);
+    assert.equal(service.calculateSalary("ASSISTANT", 15), 29000);
 });
 
 

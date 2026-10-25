@@ -37,15 +37,15 @@ test("кошторис рахує зарплати за формулою нез�
         }
     ], 2);
 
-    assert.equal(result.groups[0].educatorMonthlySalary, 31500);
-    assert.equal(result.groups[0].assistantMonthlySalary, 20000);
-    assert.equal(result.groups[0].totalMonthlySalary, 51500);
+    assert.equal(result.groups[0].educatorMonthlySalary, 45000);
+    assert.equal(result.groups[0].assistantMonthlySalary, 29000);
+    assert.equal(result.groups[0].totalMonthlySalary, 74000);
     assert.equal(result.groups[1].educatorMonthlySalary, 20000);
     assert.equal(result.groups[1].assistantMonthlySalary, 20000);
-    assert.equal(result.groupsMonthlySalary, 91500);
-    assert.equal(result.teachersMonthlySalary, 80000);
+    assert.equal(result.groupsMonthlySalary, 114000);
+    assert.equal(result.totalMonthlySalary, 274000);
     assert.equal(result.managerMonthlySalary, 80000);
-    assert.equal(result.totalMonthlySalary, 251500);
+    assert.equal(result.totalMonthlySalary, 274000);
 });
 
 test("кошторис для групи без призначених працівників все одно включає обидві ставки", () => {
@@ -119,10 +119,10 @@ test("кошторис додає оренду за кількістю груп,
 
     const result = await staffService.getSalaryEstimates();
 
-    assert.equal(result.totalMonthlyPersonnelExpenses, 251500);
+    assert.equal(result.totalMonthlyPersonnelExpenses, 274000);
     assert.equal(result.rent.roomCount, 2);
     assert.equal(result.rent.totalMonthlyRent, 100000);
-    assert.equal(result.totalMonthlyExpenses, 351500);
-    assert.equal(result.groups[0].educator.monthlySalary, 31500);
-    assert.equal(result.groups[0].assistant.monthlySalary, 20000);
+    assert.equal(result.totalMonthlyExpenses, 374000);
+    assert.equal(result.groups[0].educator.monthlySalary, 45000);
+    assert.equal(result.groups[0].assistant.monthlySalary, 29000);
 });

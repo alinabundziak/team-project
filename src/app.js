@@ -4,9 +4,11 @@ const express = require("express");
 const childrenRoutes = require("./modules/children/children.routes");
 const roomsRoutes = require("./modules/rooms/rooms.routes");
 const staffRoutes = require("./modules/employees/staff.routes");
+const activitiesRoutes = require("./modules/activities/activities.routes");
 const groupsRoutes = require("./modules/groups/groups.routes");
 const optimizationRoutes = require("./modules/optimization/optimization.routes");
 const payrollRoutes = require("./modules/payroll/payroll.routes");
+const expenseSettingsRoutes = require("./modules/payroll/expenseSettings.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
 const autoScheduleRoutes = require("../controllers/autoScheduleRoutes");
@@ -36,7 +38,9 @@ app.use("/api/parents", require("./modules/parents/parents.routes"));
 
 app.use("/api/groups", groupsRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/activities", activitiesRoutes);
 app.use("/api/payroll", payrollRoutes);
+app.use("/api/expense-settings", expenseSettingsRoutes);
 app.use("/api/optimization", optimizationRoutes);
 
 app.use("/api", autoScheduleRoutes);

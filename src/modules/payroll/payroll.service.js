@@ -1,30 +1,49 @@
 const prisma = require("../../config/prisma");
+const expenseSettingsService = require("./expenseSettings.service");
 
-const SALARIES = {
-    ASSISTANT: 20000,
-    TEACHER: 40000,
-    MANAGER: 80000
+const DEFAULT_EXPENSE_SETTINGS = {
+    extraChildrenThreshold: 12,
+    educatorBasePerChild: 2000,
+    educatorExtraPerChild: 5000,
+    assistantBaseMonthlySalary: 20000,
+    assistantExtraPerChild: 3000,
+    teacherMonthlySalary: 40000,
+    managerMonthlySalary: 80000,
+    rentPerGroup: 50000
 };
 
-function calculateEducatorSalary(childrenCount) {
-    return 2000 * childrenCount +
-        500 * Math.max(0, childrenCount - 12);
+function calculateEducatorSalary(
+    childrenCount,
+    settings = DEFAULT_EXPENSE_SETTINGS
+) {
+    return settings.educatorBasePerChild * childrenCount +
+        settings.educatorExtraPerChild *
+            Math.max(0, childrenCount - settings.extraChildrenThreshold);
 }
 
-function calculateSalary(position, childrenCount = 0) {
+function calculateAssistantSalary(
+    childrenCount = 0,
+    settings = DEFAULT_EXPENSE_SETTINGS
+) {
+    return settings.assistantBaseMonthlySalary +
+        settings.assistantExtraPerChild *
+            Math.max(0, childrenCount - settings.extraChildrenThreshold);
+}
+
+function calculateSalary(
+    position,
+    childrenCount = 0,
+    settings = DEFAULT_EXPENSE_SETTINGS
+) {
     switch (position) {
         case "EDUCATOR":
-            return calculateEducatorSalary(childrenCount);
-
+            return calculateEducatorSalary(childrenCount, settings);
         case "ASSISTANT":
-            return SALARIES.ASSISTANT;
-
+            return calculateAssistantSalary(childrenCount, settings);
         case "TEACHER":
-            return SALARIES.TEACHER;
-
+            return settings.teacherMonthlySalary;
         case "MANAGER":
-            return SALARIES.MANAGER;
-
+            return settings.managerMonthlySalary;
         default:
             throw new Error(`Невідома посада: ${position}`);
     }
@@ -62,14 +81,16 @@ async function getGroupPayroll(groupId) {
         throw error;
     }
 
+    const settings = await expenseSettingsService.getExpenseSettings();
+
     const childrenCount = group.children.length;
 
     const educatorSalary = group.employees_educator
-        ? calculateSalary("EDUCATOR", childrenCount)
+        ? calculateSalary("EDUCATOR", childrenCount, settings)
         : 0;
 
     const assistantSalary = group.employees_assistant
-        ? calculateSalary("ASSISTANT")
+        ? calculateSalary("ASSISTANT", childrenCount, settings)
         : 0;
 
     return {
@@ -94,18 +115,11 @@ async function getGroupPayroll(groupId) {
     };
 }
 
-/**
- * Розраховує кошторис за погодженою формулою незалежно від фактичних
- * призначень працівників у групи.
- *
- * Σ(зарплата вихователя + 20 000 грн помічнику для кожної групи)
- * + 40 000 грн за кожного TEACHER + 80 000 грн за одного менеджера.
- */
-function calculateKindergartenSalaryEstimate(groups, teachersCount) {
+function calculateKindergartenSalaryEstimate(groups, teachersCount, settings = DEFAULT_EXPENSE_SETTINGS) {
     const groupEstimates = groups.map(group => {
         const childrenCount = group.children.length;
-        const educatorMonthlySalary = calculateEducatorSalary(childrenCount);
-        const assistantMonthlySalary = SALARIES.ASSISTANT;
+        const educatorMonthlySalary = calculateEducatorSalary(childrenCount, settings);
+        const assistantMonthlySalary = calculateAssistantSalary(childrenCount, settings);
 
         return {
             groupId: group.id,
@@ -122,8 +136,8 @@ function calculateKindergartenSalaryEstimate(groups, teachersCount) {
         (total, group) => total + group.totalMonthlySalary,
         0
     );
-    const teachersMonthlySalary = teachersCount * SALARIES.TEACHER;
-    const managerMonthlySalary = SALARIES.MANAGER;
+    const teachersMonthlySalary = teachersCount * settings.teacherMonthlySalary;
+    const managerMonthlySalary = settings.managerMonthlySalary;
 
     return {
         groups: groupEstimates,
@@ -132,6 +146,8 @@ function calculateKindergartenSalaryEstimate(groups, teachersCount) {
         teachersMonthlySalary,
         managerCount: 1,
         managerMonthlySalary,
+        monthlySalaryPerTeacher: settings.teacherMonthlySalary,
+        rentPerGroup: settings.rentPerGroup,
         totalMonthlySalary:
             groupsMonthlySalary +
             teachersMonthlySalary +
@@ -153,9 +169,12 @@ async function getKindergartenSalaryEstimate(groups) {
         where: { position: "TEACHER" }
     });
 
+    const settings = await expenseSettingsService.getExpenseSettings();
+
     return calculateKindergartenSalaryEstimate(
         groupsForEstimate,
-        teachersCount
+        teachersCount,
+        settings
     );
 }
 
@@ -192,6 +211,7 @@ async function getKindergartenPayroll() {
         })
     ]);
 
+    const settings = await expenseSettingsService.getExpenseSettings();
     const employeeSalaries = new Map();
 
     for (const group of groups) {
@@ -200,14 +220,14 @@ async function getKindergartenPayroll() {
         if (group.employees_educator) {
             employeeSalaries.set(
                 group.employees_educator.id,
-                calculateSalary("EDUCATOR", childrenCount)
+                calculateSalary("EDUCATOR", childrenCount, settings)
             );
         }
 
         if (group.employees_assistant) {
             employeeSalaries.set(
                 group.employees_assistant.id,
-                calculateSalary("ASSISTANT")
+                calculateSalary("ASSISTANT", childrenCount, settings)
             );
         }
     }
@@ -220,7 +240,7 @@ async function getKindergartenPayroll() {
                 ? employeeSalaries.get(employee.id)
                 : 0;
         } else {
-            salary = calculateSalary(employee.position);
+            salary = calculateSalary(employee.position, 0, settings);
         }
 
         return {
