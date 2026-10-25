@@ -26,11 +26,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/children", childrenRoutes);
-app.use("/rooms", roomsRoutes);
-app.use("/staff", staffRoutes);
-app.use("/groups", groupsRoutes);
-
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/children", childrenRoutes);
@@ -38,6 +33,7 @@ app.use("/api/parents", require("./modules/parents/parents.routes"));
 
 app.use("/api/groups", groupsRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/rooms", roomsRoutes);
 app.use("/api/activities", activitiesRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/expense-settings", expenseSettingsRoutes);
