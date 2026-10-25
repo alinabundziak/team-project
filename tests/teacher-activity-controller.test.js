@@ -34,8 +34,10 @@ test("повертає список викладачів дисципліни з
 
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.body, {
-        activityId: 1,
-        teachers: [{ id: 7, firstName: "Олена" }]
+        data: {
+            activityId: 1,
+            teachers: [{ id: 7, firstName: "Олена" }]
+        }
     });
 });
 
@@ -51,7 +53,7 @@ test("призначає викладача зі статусом 201", async ()
     );
 
     assert.equal(res.statusCode, 201);
-    assert.deepEqual(res.body, { activityId: 1, teacherId: 7 });
+    assert.deepEqual(res.body, { data: { activityId: 1, teacherId: 7 }});
 });
 
 test("повертає 409, якщо призначення конфліктує", async () => {
@@ -94,5 +96,5 @@ test("скасовує призначення зі статусом 200", async 
     );
 
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, { activityId: 1, teacherId: 7 });
+    assert.deepEqual(res.body, { data: { activityId: 1, teacherId: 7 }});
 });

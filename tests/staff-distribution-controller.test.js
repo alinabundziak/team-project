@@ -64,7 +64,7 @@ test("повертає 200 і результат аналізу", async () => {
     await controller.getStaffDistributionAnalysis(req, res);
 
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, serviceResult);
+    assert.deepEqual(res.body, { data: serviceResult });
 });
 
 test("повертає статус помилки сервісу", async () => {

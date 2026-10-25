@@ -1,15 +1,8 @@
 const prisma = require("../../config/prisma");
-
-const DEFAULTS = {
-    extraChildrenThreshold: 12,
-    educatorBasePerChild: 2000,
-    educatorExtraPerChild: 5000,
-    assistantBaseMonthlySalary: 20000,
-    assistantExtraPerChild: 3000,
-    teacherMonthlySalary: 40000,
-    managerMonthlySalary: 80000,
-    rentPerGroup: 50000
-};
+const {
+    DEFAULTS,
+    validateExpenseSettingsPatch
+} = require("./expenseSettings.validation");
 
 const RULE_NAMES = {
     educator: "PAYROLL_EDUCATOR",
@@ -84,30 +77,10 @@ async function getExpenseSettings() {
 }
 
 async function updateExpenseSettings(patch) {
-    if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
-        throw createSettingsError("Передайте параметри у форматі JSON");
-    }
+    const validationError = validateExpenseSettingsPatch(patch);
 
-    const allowedKeys = Object.keys(DEFAULTS);
-    const keys = Object.keys(patch);
-
-    if (keys.length === 0 || keys.some(key => !allowedKeys.includes(key))) {
-        throw createSettingsError("Передано порожні або невідомі параметри");
-    }
-
-    for (const [key, value] of Object.entries(patch)) {
-        const isThreshold = key === "extraChildrenThreshold";
-        const validNumber =
-            typeof value === "number" &&
-            Number.isFinite(value) &&
-            value >= 0 &&
-            (isThreshold
-                ? Number.isInteger(value)
-                : Math.abs(value * 100 - Math.round(value * 100)) < 0.000001);
-
-        if (!validNumber) {
-            throw createSettingsError(`Некоректне значення параметра ${key}`);
-        }
+    if (validationError) {
+        throw createSettingsError(validationError);
     }
 
     const settings = {

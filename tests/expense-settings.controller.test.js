@@ -34,7 +34,7 @@ test("повертає параметри витрат зі статусом 200
     await controller.getSettings({}, res);
 
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, settings);
+    assert.deepEqual(res.body, { data: settings });
 });
 
 test("оновлює параметри витрат зі статусом 200", async () => {
@@ -50,15 +50,16 @@ test("оновлює параметри витрат зі статусом 200",
     );
 
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body, settings);
+    assert.deepEqual(res.body, { data: settings });
 });
 
-test("повертає помилку валідації зі статусом 400", async () => {
+test("відхиляє некоректний запит до виклику сервісу", async () => {
+    let serviceCalled = false;
+
     const controller = loadController({
         updateExpenseSettings: async () => {
-            const error = new Error("Некоректне значення");
-            error.status = 400;
-            throw error;
+            serviceCalled = true;
+            throw new Error("Сервіс не мав викликатися");
         }
     });
     const res = createResponse();
@@ -66,5 +67,9 @@ test("повертає помилку валідації зі статусом 4
     await controller.updateSettings({ body: {} }, res);
 
     assert.equal(res.statusCode, 400);
-    assert.equal(res.body.error.message, "Некоректне значення");
+    assert.equal(
+        res.body.error.message,
+        "Передано порожні або невідомі параметри"
+    );
+    assert.equal(serviceCalled, false);
 });

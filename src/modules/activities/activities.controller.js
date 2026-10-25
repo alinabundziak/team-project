@@ -27,7 +27,7 @@ async function getTeachers(req, res) {
 
     try {
         const teachers = await service.getTeachersForActivity(activityId);
-        return res.status(200).json({ activityId, teachers });
+        return res.status(200).json({ data: { activityId, teachers } });
     } catch (error) {
         return sendError(res, error);
     }
@@ -51,7 +51,7 @@ async function assignTeacher(req, res) {
             activityId,
             teacherId
         );
-        return res.status(201).json(assignment);
+        return res.status(201).json({ data: assignment });
     } catch (error) {
         return sendError(res, error);
     }
@@ -75,7 +75,7 @@ async function removeTeacher(req, res) {
             activityId,
             teacherId
         );
-        return res.status(200).json(result);
+        return res.status(200).json({ data: result });
     } catch (error) {
         return sendError(res, error);
     }

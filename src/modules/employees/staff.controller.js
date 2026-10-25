@@ -216,7 +216,7 @@ async function getStaff(req, res) {
         const includeSalary = req.user.role === ROLES.ADMIN;
         const staff = await service.getStaff(includeSalary);
 
-        return res.status(200).json(staff);
+        return res.status(200).json({ data: staff });
     } catch (error) {
         return handleStaffError(error, res);
     }
@@ -237,7 +237,7 @@ async function getStaffById(req, res) {
         const includeSalary = req.user.role === ROLES.ADMIN;
         const staff = await service.getStaffById(id, includeSalary);
 
-        return res.status(200).json(staff);
+        return res.status(200).json({ data: staff });
     } catch (error) {
         return handleStaffError(error, res);
     }
@@ -262,7 +262,7 @@ async function createStaff(req, res) {
         const includeSalary = req.user.role === ROLES.ADMIN;
         const staff = await service.createStaff(result.data, includeSalary);
 
-        return res.status(201).json(staff);
+        return res.status(201).json({ data: staff });
     } catch (error) {
         return handleStaffError(error, res);
     }
@@ -297,7 +297,7 @@ async function updateStaff(req, res) {
         const includeSalary = req.user.role === ROLES.ADMIN;
         const staff = await service.updateStaff(id, result.data, includeSalary);
 
-        return res.status(200).json(staff);
+        return res.status(200).json({ data: staff });
     } catch (error) {
         return handleStaffError(error, res);
     }
@@ -318,7 +318,9 @@ async function deleteStaff(req, res) {
         await service.deleteStaff(id);
 
         return res.status(200).json({
-            message: "Працівника успішно видалено"
+            data: {
+                message: "Працівника успішно видалено"
+            }
         });
     } catch (error) {
         return handleStaffError(error, res);
@@ -328,7 +330,7 @@ async function deleteStaff(req, res) {
 async function getSalaryEstimates(req, res) {
     try {
         const estimates = await service.getSalaryEstimates();
-        return res.status(200).json(estimates);
+        return res.status(200).json({ data: estimates });
     } catch (error) {
         return handleStaffError(error, res);
     }
@@ -382,7 +384,7 @@ async function getStaffDistributionAnalysis(req, res) {
     try {
         const analysis = await service.getStaffDistributionAnalysis(options);
 
-        return res.status(200).json(analysis);
+        return res.status(200).json({ data: analysis });
     } catch (error) {
         return handleStaffError(error, res);
     }
