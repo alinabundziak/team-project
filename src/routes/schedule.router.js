@@ -3,13 +3,17 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const { checkScheduleConflicts, generateDraftSchedule } = require('../services/schedule.service');
 const { validateActivity, validateScheduleCreate, validateScheduleUpdate } = require('../validators/schedule.validator');
-const { authenticateToken, authorizeRoles } = require('../middleware/auth.middleware');
+
+// Підключаємо авторизаційний middleware Софії
+const { authenticate, authorizeRoles } = require('../middlewares/auth');
 
 const asyncHandler = fn => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-router.use(authenticateToken);
+// Захищаємо всі маршрути розкладу та занять
+router.use(authenticate);
+
 
 router.get('/activities', asyncHandler(async (req, res) => {
   const list = await prisma.activities.findMany();
