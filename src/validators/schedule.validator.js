@@ -1,3 +1,8 @@
+function isPositiveInteger(val) {
+  const num = Number(val);
+  return Number.isInteger(num) && num > 0;
+}
+
 function isValidTimeFormat(timeStr) {
   if (typeof timeStr !== 'string') return false;
   const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -15,18 +20,11 @@ function validateActivity(req, res, next) {
 function validateScheduleCreate(req, res, next) {
   const { group_id, activity_id, teacher_id, room_id, day_of_week, start_time, end_time } = req.body;
 
-  if (!group_id || isNaN(Number(group_id))) {
-    return res.status(400).json({ error: "Некоректний або відсутній 'group_id'" });
-  }
-  if (!activity_id || isNaN(Number(activity_id))) {
-    return res.status(400).json({ error: "Некоректний або відсутній 'activity_id'" });
-  }
-  if (!teacher_id || isNaN(Number(teacher_id))) {
-    return res.status(400).json({ error: "Некоректний або відсутній 'teacher_id'" });
-  }
-  if (!room_id || isNaN(Number(room_id))) {
-    return res.status(400).json({ error: "Некоректний або відсутній 'room_id'" });
-  }
+  if (!isPositiveInteger(group_id)) return res.status(400).json({ error: "group_id має бути додатним цілим числом" });
+  if (!isPositiveInteger(activity_id)) return res.status(400).json({ error: "activity_id має бути додатним цілим числом" });
+  if (!isPositiveInteger(teacher_id)) return res.status(400).json({ error: "teacher_id має бути додатним цілим числом" });
+  if (!isPositiveInteger(room_id)) return res.status(400).json({ error: "room_id має бути додатним цілим числом" });
+  
   if (!day_of_week || typeof day_of_week !== 'string') {
     return res.status(400).json({ error: "Некоректний або відсутній 'day_of_week'" });
   }
@@ -41,7 +39,13 @@ function validateScheduleCreate(req, res, next) {
 }
 
 function validateScheduleUpdate(req, res, next) {
-  const { start_time, end_time } = req.body;
+  const { group_id, activity_id, teacher_id, room_id, start_time, end_time } = req.body;
+
+  if (group_id !== undefined && !isPositiveInteger(group_id)) return res.status(400).json({ error: "group_id має бути додатним цілим числом" });
+  if (activity_id !== undefined && !isPositiveInteger(activity_id)) return res.status(400).json({ error: "activity_id має бути додатним цілим числом" });
+  if (teacher_id !== undefined && !isPositiveInteger(teacher_id)) return res.status(400).json({ error: "teacher_id має бути додатним цілим числом" });
+  if (room_id !== undefined && !isPositiveInteger(room_id)) return res.status(400).json({ error: "room_id має бути додатним цілим числом" });
+
   if (start_time && !isValidTimeFormat(start_time)) {
     return res.status(400).json({ error: "Некоректний формат 'start_time' (очікується HH:MM)" });
   }
@@ -52,6 +56,7 @@ function validateScheduleUpdate(req, res, next) {
 }
 
 module.exports = {
+  isPositiveInteger,
   isValidTimeFormat,
   validateActivity,
   validateScheduleCreate,
