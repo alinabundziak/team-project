@@ -1,4 +1,3 @@
-
 const express = require("express");
 
 const childrenRoutes = require("./modules/children/children.routes");
@@ -12,6 +11,9 @@ const payrollRoutes = require("./modules/payroll/payroll.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/users.routes");
 const autoScheduleRoutes = require("../controllers/autoScheduleRoutes");
+
+
+const scheduleRouter = require("./routes/schedule.router");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -40,6 +42,8 @@ app.use("/api/analytics", analyticsRouter);
 app.use("/api/discounts", require("./modules/discounts/discounts.routes"));
 app.use("/api/tariffs", require("./modules/tariffs/tariffs.routes"));
 app.use("/api", autoScheduleRoutes);
+
+app.use("/api", scheduleRouter);
 
 if (process.env.NODE_ENV !== "production") {
   app.use(
