@@ -14,6 +14,7 @@ const refundsRepo = require('../refunds/refunds.repository');
 const Decimal = Prisma.Decimal;
 const { getTariffAmount } = require('../tariffs/tariffs.service');
 const adjustmentsRepo = require('../adjustments/adjustments.repository');
+const { assertChildAccess } = require('../children/children.access');
 
 function parseMonth(value) {
   const m = typeof value === 'string' ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value.trim()) : null;
@@ -48,17 +49,20 @@ function toChargeDto(c) {
   };
 }
 
-async function requireChild(rawChildId) {
+async function requireChild(rawChildId, user) {
   const childId = parseId(rawChildId, 'childId');
+  if (user) {
+    return await assertChildAccess(user, childId);
+  }
   const child = await childrenRepo.findById(childId);
   if (!child) throw new AppError(404, 'Дитину не знайдено');
   return child;
 }
 
-async function createCharge(rawChildId, input) {
+async function createCharge(rawChildId, input, user) {
   const periodStart = parseMonth(input.month);
   const mealDays = parseMealDays(input.mealDays);
-  const child = await requireChild(rawChildId);
+  const child = await requireChild(rawChildId, user);
 
   const discountPercent = await pricing.getChildDiscountPercent(child);
   const baseFee = await getTariffAmount(cfg.TARIFF_TUITION_CODE, periodStart);
@@ -101,8 +105,8 @@ async function createCharge(rawChildId, input) {
   }
 }
 
-async function listCharges(rawChildId, query = {}) {
-  const child = await requireChild(rawChildId);
+async function listCharges(rawChildId, query = {}, user) {
+  const child = await requireChild(rawChildId, user);
   const { page, limit } = parsePagination(query);
   const where = { child_id: child.id };
 
@@ -114,8 +118,8 @@ async function listCharges(rawChildId, query = {}) {
   return { data: items.map(toChargeDto), meta: { page, limit, total } };
 }
 
-async function getBalance(rawChildId) {
-  const child = await requireChild(rawChildId);
+async function getBalance(rawChildId, user) {
+  const child = await requireChild(rawChildId, user);
 
   const [charged, paid, refunded, adjustments] = await Promise.all([
     repo.sumTotalByChild(child.id),
@@ -135,8 +139,8 @@ async function getBalance(rawChildId) {
   return { childId: child.id, ...result };
 }
 
-async function getFinancialHistory(rawChildId) {
-  const child = await requireChild(rawChildId);
+async function getFinancialHistory(rawChildId, user) {
+  const child = await requireChild(rawChildId, user);
 
   const [charges, payments, refunds, adjustments] = await Promise.all([
     repo.findMany({ where: { child_id: child.id } }),

@@ -21,7 +21,13 @@ async function createPayment(rawChildId, input) {
   if (!child) throw new AppError(404, 'Дитину не знайдено');
 
   try {
-    const payment = await repo.create({ child_id: childId, amount: amount.toFixed(2) });
+    const formattedAmount = amount.toFixed(2);
+    const payment = await repo.create({
+      child_id: childId,
+      amount: formattedAmount,
+      paid_amount: formattedAmount,
+      status: 'PAID',
+    });
     return toPaymentDto(payment);
   } catch (err) {
     if (err.code === 'P2003') throw new AppError(404, 'Дитину не знайдено');
