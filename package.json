@@ -38,6 +38,6 @@
     "node": ">=18.18"
   },
   "prisma": {
-    "seed": "node prisma/users.js"
+    "seed": "node prisma/seed.js"
   }
 }
