@@ -15,8 +15,8 @@ class AnalyticsService {
 
       let chargesTotal = new Decimal(0);
       try {
-        if (prisma.charges) {
-          const res = await prisma.charges.aggregate({
+        if (prisma.charge) {
+          const res = await prisma.charge.aggregate({
             _sum: { total_amount: true },
             where: dateFilter,
           });
@@ -28,12 +28,12 @@ class AnalyticsService {
 
       let paymentsTotal = new Decimal(0);
       try {
-        if (prisma.payments) {
-          const res = await prisma.payments.aggregate({
-            _sum: { paid_amount: true },
-            where: { ...dateFilter, status: 'PAID' },
+        if (prisma.payment) {
+          const res = await prisma.payment.aggregate({
+            _sum: { amount: true },
+            where: dateFilter,
           });
-          paymentsTotal = new Decimal(res?._sum?.paid_amount?.toString() || 0);
+          paymentsTotal = new Decimal(res?._sum?.amount?.toString() || 0);
         }
       } catch (e) {
         paymentsTotal = new Decimal(0);
@@ -41,8 +41,8 @@ class AnalyticsService {
 
       let refundsTotal = new Decimal(0);
       try {
-        if (prisma.refunds) {
-          const res = await prisma.refunds.aggregate({
+        if (prisma.refund) {
+          const res = await prisma.refund.aggregate({
             _sum: { amount: true },
             where: dateFilter,
           });
@@ -58,13 +58,13 @@ class AnalyticsService {
 
       let groups = [];
       try {
-        if (prisma.groups) {
-          groups = await prisma.groups.findMany({
+        if (prisma.group) {
+          groups = await prisma.group.findMany({
             include: {
               children: {
                 include: {
                   charges: { where: dateFilter },
-                  payments: { where: { ...dateFilter, status: 'PAID' } },
+                  payments: { where: dateFilter },
                 },
               },
             },
@@ -74,16 +74,16 @@ class AnalyticsService {
         groups = [];
       }
 
-      const activePricingPlan = await prisma.pricing_plans?.findFirst({
-        where: { is_active: true },
-        orderBy: { effective_from: 'desc' },
+      const activeTariff = await prisma.tariff?.findFirst({
+        where: { code: 'TUITION_MONTHLY' },
+        orderBy: { valid_from: 'desc' },
       }).catch(() => null);
 
-      const activeMealRate = await prisma.meal_rates?.findFirst({
+      const activeMealRate = await prisma.mealRate?.findFirst({
         orderBy: { daily_rate: 'desc' },
       }).catch(() => null);
 
-      const baseTuitionPrice = new Decimal(activePricingPlan?.amount?.toString() || 15000);
+      const baseTuitionPrice = new Decimal(activeTariff?.amount?.toString() || 15000);
       const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
       const avgRevenuePerChild = baseTuitionPrice.mul(0.9).add(baseDailyMealFee.mul(22));
 
@@ -96,7 +96,7 @@ class AnalyticsService {
             groupCharged = groupCharged.add(new Decimal(charge.total_amount?.toString() || 0));
           }
           for (const payment of child.payments || []) {
-            groupPaid = groupPaid.add(new Decimal(payment.paid_amount?.toString() || 0));
+            groupPaid = groupPaid.add(new Decimal(payment.amount?.toString() || 0));
           }
         }
 
@@ -148,8 +148,8 @@ class AnalyticsService {
 
       let teachersCount = 0;
       try {
-        if (prisma.employees) {
-          teachersCount = await prisma.employees.count({ where: { position: 'TEACHER' } });
+        if (prisma.employee) {
+          teachersCount = await prisma.employee.count({ where: { position: 'TEACHER' } });
         }
       } catch (e) {
         teachersCount = 0;
@@ -194,14 +194,10 @@ class AnalyticsService {
   }
 
   async getDebtsReport() {
-    const children = await prisma.children.findMany({
+    const children = await prisma.child.findMany({
       include: {
         charges: true,
-        payments: {
-          where: {
-            status: 'PAID',
-          },
-        },
+        payments: true,
         refunds: true, 
       },
     });
@@ -217,7 +213,7 @@ class AnalyticsService {
       );
 
       const totalPaid = child.payments.reduce(
-        (acc, p) => acc.add(new Decimal(p.paid_amount?.toString() || 0)),
+        (acc, p) => acc.add(new Decimal(p.amount?.toString() || 0)),
         new Decimal(0)
       );
 
@@ -258,21 +254,21 @@ class AnalyticsService {
   }
 
   async getRevenueForecast() {
-    const activePricingPlan = await prisma.pricing_plans?.findFirst({
-      where: { is_active: true },
-      orderBy: { effective_from: 'desc' },
+    const activeTariff = await prisma.tariff?.findFirst({
+      where: { code: 'TUITION_MONTHLY' },
+      orderBy: { valid_from: 'desc' },
     }).catch(() => null);
 
-    const activeMealRate = await prisma.meal_rates?.findFirst({
+    const activeMealRate = await prisma.mealRate?.findFirst({
       orderBy: { daily_rate: 'desc' },
     }).catch(() => null);
 
-    const baseTuitionPrice = new Decimal(activePricingPlan?.amount?.toString() || 15000);
+    const baseTuitionPrice = new Decimal(activeTariff?.amount?.toString() || 15000);
     const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
 
-    const children = await prisma.children.findMany({
+    const children = await prisma.child.findMany({
       include: {
-        discounts: true,
+        discount: true,
       },
     });
 
@@ -282,7 +278,7 @@ class AnalyticsService {
     const WORK_DAYS_PER_MONTH = 22;
 
     for (const child of children) {
-      const discountPct = child.discounts ? new Decimal(child.discounts.percentage?.toString() || 0) : new Decimal(0);
+      const discountPct = child.discount ? new Decimal(child.discount.percent?.toString() || 0) : new Decimal(0);
       const discountMultiplier = new Decimal(1).sub(discountPct.div(100));
       const childTuition = baseTuitionPrice.mul(discountMultiplier);
       expectedTuitionRevenue = expectedTuitionRevenue.add(childTuition);
@@ -304,7 +300,7 @@ class AnalyticsService {
     const targetChildrenPerGroup = (!isNaN(rawTarget) && rawTarget > 0) ? rawTarget : 12;
 
     const rawGroups = parseInt(scenarioParams.targetGroupsCount, 10);
-    const dbGroupsCount = await prisma.groups.count().catch(() => 1);
+    const dbGroupsCount = await prisma.group.count().catch(() => 1);
     const targetGroupsCount = (!isNaN(rawGroups) && rawGroups > 0) ? rawGroups : (dbGroupsCount || 1);
 
     const rawTariffChange = parseFloat(scenarioParams.tariffPriceChangePercent);
@@ -313,16 +309,16 @@ class AnalyticsService {
     const rawDiscountChange = parseFloat(scenarioParams.discountChangePercent);
     const discountChangePercent = !isNaN(rawDiscountChange) ? rawDiscountChange : 0;
 
-    const activePricingPlan = await prisma.pricing_plans?.findFirst({
-      where: { is_active: true },
-      orderBy: { effective_from: 'desc' },
+    const activeTariff = await prisma.tariff?.findFirst({
+      where: { code: 'TUITION_MONTHLY' },
+      orderBy: { valid_from: 'desc' },
     }).catch(() => null);
 
-    const activeMealRate = await prisma.meal_rates?.findFirst({
+    const activeMealRate = await prisma.mealRate?.findFirst({
       orderBy: { daily_rate: 'desc' },
     }).catch(() => null);
 
-    const baseTuitionFromDb = new Decimal(activePricingPlan?.amount?.toString() || 15000);
+    const baseTuitionFromDb = new Decimal(activeTariff?.amount?.toString() || 15000);
     const baseMealFeeFromDb = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
 
     const simulatedChildrenCount = targetChildrenPerGroup * targetGroupsCount;
@@ -402,8 +398,8 @@ class AnalyticsService {
   async getStaffOptimizationRecommendations() {
     let groups = [];
     try {
-      if (prisma.groups) {
-        groups = await prisma.groups.findMany({
+      if (prisma.group) {
+        groups = await prisma.group.findMany({
           include: { children: true },
         });
       }

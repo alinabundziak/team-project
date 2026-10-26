@@ -170,7 +170,7 @@ class PricingService {
         }
 
         const selectedPeriod = isAnnual ? 'ANNUAL' : 'MONTHLY';
-        const tuitionCalc = calculateTuition({
+        const tuitionCalc = calculateTuitionCalc({
             baseFee: baseTuition,
             discountPercent: benefitPercent,
             period: selectedPeriod
@@ -356,7 +356,7 @@ const { isSupportedPercent } = require('../discounts/discounts.service');
 const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
 const cfg = require('../../config/pricing');
-const { calculateTuition } = require('./tuition.calculator');
+const { calculateTuition: calculateTuitionCalc } = require('./tuition.calculator');
 const pricingRepo = require('./pricing.repository');
 const { getTariffAmount } = require('../tariffs/tariffs.service');
 const { mealPriceForDays } = require('./meal.calculator');
@@ -442,7 +442,7 @@ async function estimateTuition(rawChildId, query = {}) {
         startOfMonthUtc(todayUtc())
     );
 
-    const calculation = calculateTuition({
+    const calculation = calculateTuitionCalc({
         baseFee,
         discountPercent: percent,
         period

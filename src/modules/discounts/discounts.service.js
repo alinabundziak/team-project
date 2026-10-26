@@ -13,9 +13,9 @@ function isSupportedPercent(percent) {
 function toDiscountDto(d) {
   return {
     id: d.id,
-    code: d.code,
-    name: d.description || d.code,
-    percent: new Decimal(d.percentage).toNumber(),
+    code: d.code || null,
+    name: d.description || (d.code ? d.code : `Знижка ${d.percent}%`),
+    percent: new Decimal(d.percent).toNumber(),
   };
 }
 
@@ -24,8 +24,8 @@ async function listDiscounts() {
 
   return {
     data: rows
-      .filter((d) => isSupportedPercent(d.percentage))
-      .map(toDiscountDto)
+      .filter((d) => isSupportedPercent(d.percent))
+      .map(toDiscountDto),
   };
 }
 

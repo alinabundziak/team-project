@@ -1,288 +1,338 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique @db.VarChar(50)
+  users User[]
+
+  @@map("roles")
 }
 
-enum PaymentStatus {
-  PENDING
-  PAID
-  PARTIALLY_PAID
-  CANCELLED
-}
-
-model roles {
-  id    Int     @id @default(autoincrement())
-  name  String  @unique @db.VarChar(50)
-  users users[]
-}
-
-model users {
-  id            Int           @id @default(autoincrement())
-  email         String        @unique @db.VarChar(150)
-  password_hash String        @db.VarChar(255)
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  password_hash String    @db.VarChar(255)
   role_id       Int?
-  created_at    DateTime?     @default(now()) @db.Timestamp(6)
-  adjustments   adjustments[]
-  employees     employees?
-  parents       parents?
-  roles         roles?        @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  first_name    String?   @db.VarChar(100)
+  last_name     String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+
+  role          Role?     @relation(fields: [role_id], references: [id])
+  parent        Parent?
+  employee      Employee?
+
+  @@map("users")
 }
 
-model employees {
-  id                 Int                  @id @default(autoincrement())
-  user_id            Int?                 @unique
-  first_name         String               @db.VarChar(100)
-  last_name          String               @db.VarChar(100)
-  phone              String?              @db.VarChar(20)
-  position           String               @db.VarChar(100)
-  subject            String?              @db.VarChar(100)
-  salary             Decimal              @default(40000.00) @db.Decimal(10, 2)
-  users              users?               @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups_assistant   groups[]             @relation("groups_assistant_idToemployees")
-  groups_educator    groups[]             @relation("groups_educator_idToemployees")
-  schedules          schedules[]
-  staff_assignments  staff_assignments[]
-  teacher_activities teacher_activities[]
+model Parent {
+  id         Int           @id @default(autoincrement())
+  user_id    Int?          @unique
+  first_name String        @db.VarChar(100)
+  last_name  String        @db.VarChar(100)
+  phone      String?       @db.VarChar(20)
+  created_at DateTime      @default(now())
+
+  user       User?         @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  children   ChildParent[]
+
+  @@map("parents")
 }
 
-model parents {
-  id         Int        @id @default(autoincrement())
-  user_id    Int?       @unique
-  first_name String     @db.VarChar(100)
-  last_name  String     @db.VarChar(100)
-  phone      String?    @db.VarChar(20)
-  children   children[]
-  users      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-model rooms {
-  id          Int         @id @default(autoincrement())
-  name        String      @unique @db.VarChar(100)
-  capacity    Int         @default(15)
-  description String?     @db.Text
-  groups      groups[]
-  schedules   schedules[]
-}
-
-model groups {
-  id                  Int                 @id @default(autoincrement())
-  name                String              @db.VarChar(100)
-  target_age          Int
-  capacity            Int?                @default(20)
-  room_id             Int?                @unique
-  educator_id         Int?
-  assistant_id        Int?
-  children            children[]
-  room                rooms?              @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees_assistant employees?          @relation("groups_assistant_idToemployees", fields: [assistant_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees_educator  employees?          @relation("groups_educator_idToemployees", fields: [educator_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  schedules           schedules[]
-  staff_assignments   staff_assignments[]
-}
-
-model children {
-  id             Int              @id @default(autoincrement())
-  first_name     String           @db.VarChar(100)
-  last_name      String           @db.VarChar(100)
-  birth_date     DateTime         @db.Date
+model Child {
+  id             Int            @id @default(autoincrement())
+  first_name     String         @db.VarChar(100)
+  last_name      String         @db.VarChar(100)
+  birth_date     DateTime       @db.Date
   group_id       Int?
-  parent_id      Int?
-  discount_id    Int?             @default(1)
-  discounts      discounts?       @relation(fields: [discount_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups         groups?          @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  parents        parents?         @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  charges        charges[]
-  payments       payments[]
-  subscriptions  subscriptions[]
-  child_benefits child_benefits[]
+  discount_id    Int?           @default(1)
+  parent_note    String?        @db.VarChar(255)
+  created_at     DateTime       @default(now())
+
+  group          Group?         @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  discount       Discount?      @relation(fields: [discount_id], references: [id], onDelete: SetNull)
+  parents        ChildParent[]
+  child_benefits ChildBenefit[]
+  charges        Charge[]
+  payments       Payment[]
+  subscriptions  Subscription[]
+
+  @@map("children")
 }
 
-model discounts {
-  id             Int              @id @default(autoincrement())
-  code           String?          @unique @db.VarChar(50)
-  name           String?          @db.VarChar(100)
-  description    String?          @db.VarChar(255)
-  percentage     Decimal          @default(0.00) @db.Decimal(5, 2)
-  children       children[]
-  child_benefits child_benefits[]
+model ChildParent {
+  id         Int      @id @default(autoincrement())
+  child_id   Int
+  parent_id  Int
+  created_at DateTime @default(now())
+
+  child      Child    @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  parent     Parent   @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+
+  @@unique([child_id, parent_id])
+  @@map("child_parents")
 }
 
-model activities {
-  id                 Int                  @id @default(autoincrement())
-  name               String               @db.VarChar(100)
-  schedules          schedules[]
-  teacher_activities teacher_activities[]
-}
 
-model teacher_activities {
-  employee_id Int
-  activity_id Int
-  activities  activities @relation(fields: [activity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees   employees  @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
-  @@id([employee_id, activity_id])
-}
-
-model schedules {
-  id          Int         @id @default(autoincrement())
-  group_id    Int?
-  activity_id Int?
-  teacher_id  Int?
+model Group {
+  id          Int               @id @default(autoincrement())
+  name        String            @db.VarChar(100)
+  target_age  Int
+  capacity    Int               @default(20)
   room_id     Int?
-  day_of_week Int
-  start_time  DateTime    @db.Time(6)
-  end_time    DateTime    @db.Time(6)
-  activities  activities? @relation(fields: [activity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups      groups?     @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  rooms       rooms?      @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees   employees?  @relation(fields: [teacher_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  created_at  DateTime          @default(now())
+
+  room        Room?             @relation(fields: [room_id], references: [id], onDelete: SetNull)
+  children    Child[]
+  assignments StaffAssignment[]
+  schedules   Schedule[]
+
+  @@map("groups")
 }
 
-model staff_assignments {
+model Room {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(100)
+  capacity    Int?       @default(15)
+  description String?    @db.Text
+  created_at  DateTime   @default(now())
+
+  groups      Group[]
+  schedules   Schedule[]
+
+  @@map("rooms")
+}
+
+model Employee {
+  id                 Int               @id @default(autoincrement())
+  user_id            Int?              @unique
+  first_name         String            @db.VarChar(100)
+  last_name          String            @db.VarChar(100)
+  phone              String?           @db.VarChar(20)
+  position           String            @db.VarChar(100)
+  subject            String?           @db.VarChar(100)
+  salary             Decimal           @default(40000.00) @db.Decimal(10, 2)
+  created_at         DateTime          @default(now())
+
+  user               User?             @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  assignments        StaffAssignment[]
+  teacher_activities TeacherActivity[]
+  schedules          Schedule[]
+
+  @@map("employees")
+}
+
+model StaffAssignment {
+  id          Int      @id @default(autoincrement())
   employee_id Int
   group_id    Int
-  assigned_at DateTime  @default(now()) @db.Timestamp(6)
-  employee    employees @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  group       groups    @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  role        String?  @db.VarChar(50)
+  created_at  DateTime @default(now())
 
-  @@id([employee_id, group_id])
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  group       Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@map("staff_assignments")
 }
 
-model rules {
-  id               Int       @id @default(autoincrement())
-  name             String    @db.VarChar(100)
-  min_children     Int       @default(12)
-  base_cost        Decimal   @db.Decimal(10, 2)
-  extra_child_cost Decimal?  @default(0.00) @db.Decimal(10, 2)
-  description      String?   @db.Text
-  is_active        Boolean?  @default(true)
-  created_at       DateTime? @default(now()) @db.Timestamp(6)
+model Rule {
+  id               Int      @id @default(autoincrement())
+  name             String   @db.VarChar(100)
+  base_cost        Decimal  @db.Decimal(10, 2)
+  min_children     Int?     @default(12)
+  extra_child_cost Decimal? @default(0.00) @db.Decimal(10, 2)
+  description      String?  @db.Text
+  is_active        Boolean? @default(true)
+  created_at       DateTime @default(now())
+
+  @@map("rules")
 }
 
 
-model charges {
-  id                 Int           @id @default(autoincrement())
+
+model Activity {
+  id                 Int               @id @default(autoincrement())
+  name               String            @db.VarChar(100)
+  created_at         DateTime          @default(now())
+
+  teacher_activities TeacherActivity[]
+  schedules          Schedule[]
+
+  @@map("activities")
+}
+
+model TeacherActivity {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  activity_id Int
+
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  activity    Activity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@unique([employee_id, activity_id])
+  @@map("teacher_activities")
+}
+
+model Schedule {
+  id          Int      @id @default(autoincrement())
+  group_id    Int
+  activity_id Int
+  teacher_id  Int
+  room_id     Int
+  day_of_week String   @db.VarChar(20)
+  start_time  DateTime @db.Time
+  end_time    DateTime @db.Time
+  created_at  DateTime @default(now())
+
+  group       Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  activity    Activity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  teacher     Employee @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  room        Room     @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+
+
+model Discount {
+  id          Int            @id @default(autoincrement())
+  code        String         @db.VarChar(50)
+  description String?        @db.VarChar(255)
+  percent     Decimal        @db.Decimal(5, 2)
+  children    Child[]
+
+  @@map("discounts")
+}
+
+model Tariff {
+  id         Int      @id @default(autoincrement())
+  code       String   @db.VarChar(50)
+  amount     Decimal  @db.Decimal(10, 2)
+  valid_from DateTime @db.Date
+  created_at DateTime @default(now())
+
+  @@map("tariffs")
+}
+
+model MealRate {
+  id         Int      @id @default(autoincrement())
+  age        Int
+  daily_rate Decimal  @db.Decimal(10, 2)
+  valid_from DateTime @db.Date
+
+  @@map("meal_rates")
+}
+
+model MealPlan {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+
+  @@map("meal_plans")
+}
+
+model PricingPlan {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+
+  @@map("pricing_plans")
+}
+
+model ChildBenefit {
+  id           Int    @id @default(autoincrement())
+  child_id     Int
+  benefit_type String @db.VarChar(255)
+
+  child        Child  @relation(fields: [child_id], references: [id], onDelete: Cascade)
+
+  @@map("child_benefits")
+}
+
+model Charge {
+  id                 Int          @id @default(autoincrement())
   child_id           Int
-  period             DateTime      @db.Date
-  base_fee           Decimal       @db.Decimal(10, 2)
-  discount_percent   Decimal       @db.Decimal(5, 2)
-  tuition_amount     Decimal       @db.Decimal(10, 2)
-  meal_price_per_day Decimal       @db.Decimal(10, 2)
+  period             DateTime     @db.Date
+  base_fee           Decimal      @db.Decimal(10, 2)
+  discount_percent   Decimal      @db.Decimal(5, 2)
+  tuition_amount     Decimal      @db.Decimal(10, 2)
+  meal_price_per_day Decimal      @db.Decimal(10, 2)
   meal_days          Int
-  meal_amount        Decimal       @db.Decimal(10, 2)
-  total_amount       Decimal       @db.Decimal(10, 2)
-  amount             Decimal?      @db.Decimal(10, 2)
-  created_at         DateTime?     @default(now()) @db.Timestamp(6)
-  adjustments        adjustments[]
-  children           children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  meal_amount        Decimal      @db.Decimal(10, 2)
+  total_amount       Decimal      @db.Decimal(10, 2)
+  created_at         DateTime     @default(now())
 
-  @@unique([child_id, period])
+  child              Child        @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  adjustments        Adjustment[]
+
+  @@map("charges")
 }
 
-model payments {
-  id                 Int           @id @default(autoincrement())
-  child_id           Int
-  period             String?       @db.VarChar(20)
-  due_date           DateTime?     @db.Timestamp(6)
-  base_education_fee Decimal?      @db.Decimal(10, 2)
-  benefit_percentage Decimal?      @default(0.00) @db.Decimal(5, 2)
-  annual_discount    Decimal?      @default(0.00) @db.Decimal(5, 2)
-  education_amount   Decimal?      @db.Decimal(10, 2)
-  meal_amount        Decimal?      @db.Decimal(10, 2)
-  total_amount       Decimal?      @db.Decimal(10, 2)
-  paid_amount        Decimal?      @default(0.00) @db.Decimal(10, 2)
-  amount             Decimal?      @db.Decimal(10, 2)
-  status             PaymentStatus @default(PENDING)
-  created_at         DateTime?     @default(now()) @db.Timestamp(6)
-  children           children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
-  refunds            refunds[]
+model Payment {
+  id         Int      @id @default(autoincrement())
+  child_id   Int
+  amount     Decimal  @db.Decimal(10, 2)
+  created_at DateTime @default(now())
+
+  child      Child    @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  refunds    Refund[]
+
+  @@map("payments")
 }
 
-model refunds {
-  id         Int       @id @default(autoincrement())
+model Refund {
+  id         Int      @id @default(autoincrement())
   payment_id Int
-  amount     Decimal   @db.Decimal(10, 2)
-  reason     String?   @db.VarChar(255)
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  payments   payments  @relation(fields: [payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String?  @db.VarChar(255)
+  created_at DateTime @default(now())
+
+  payment    Payment  @relation(fields: [payment_id], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
 }
 
-model tariffs {
-  id         Int       @id @default(autoincrement())
-  code       String    @db.VarChar(30)
-  amount     Decimal   @db.Decimal(10, 2)
-  valid_from DateTime  @db.Date
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-
-  @@unique([code, valid_from])
-}
-
-model meal_rates {
-  id         Int       @id @default(autoincrement())
-  age        Int       @unique
-  daily_rate Decimal   @db.Decimal(10, 2)
-  valid_from DateTime? @db.Date
-}
-
-model adjustments {
-  id         Int       @id @default(autoincrement())
+model Adjustment {
+  id         Int      @id @default(autoincrement())
   charge_id  Int
-  direction  String    @db.VarChar(10)
-  amount     Decimal   @db.Decimal(10, 2)
-  reason     String?   @db.VarChar(255)
+  direction  String   @db.VarChar(50)
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String?  @db.VarChar(255)
   created_by Int
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  charges    charges   @relation(fields: [charge_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  users      users     @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  created_at DateTime @default(now())
+
+  charge     Charge   @relation(fields: [charge_id], references: [id], onDelete: Cascade)
+
+  @@map("adjustments")
 }
 
-model subscriptions {
+model Subscription {
   id         Int       @id @default(autoincrement())
   child_id   Int
   start_date DateTime  @db.Date
   end_date   DateTime? @db.Date
-  children   children  @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  child      Child     @relation(fields: [child_id], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
 }
 
-
-model child_benefits {
-  id             Int       @id @default(autoincrement())
-  child_id       Int
-  discount_id    Int?
-  benefit_type   String?   @db.VarChar(100)
-  effective_from DateTime? @default(now()) @db.Timestamp(6)
-  effective_to   DateTime? @db.Timestamp(6)
-  is_active      Boolean?  @default(true)
-
-  children  children   @relation(fields: [child_id], references: [id], onDelete: Cascade)
-  discounts discounts? @relation(fields: [discount_id], references: [id], onDelete: Restrict)
-}
-
-model meal_plans {
-  id   Int    @id @default(autoincrement())
-  name String @db.VarChar(100)
-}
-
-model pricing_plans {
-  id             Int       @id @default(autoincrement())
-  name           String    @db.VarChar(100)
-  amount         Decimal?  @db.Decimal(10, 2)
-  monthly_fee    Decimal?  @db.Decimal(10, 2)
-  effective_from DateTime? @default(now()) @db.Timestamp(6)
-  effective_to   DateTime? @db.Timestamp(6)
-  is_active      Boolean?  @default(true)
-}
-
-model expenses {
+model Expense {
   id          Int      @id @default(autoincrement())
-  title       String   @db.VarChar(150)
+  category    String   @db.VarChar(100)
   amount      Decimal  @db.Decimal(10, 2)
-  category    String   @db.VarChar(50)
-  date        DateTime @default(now())
-  isEstimated Boolean  @default(false)
+  description String?  @db.Text
+  date        DateTime @default(now()) @db.Date
+  created_at  DateTime @default(now())
+
+  @@map("expenses")
 }
