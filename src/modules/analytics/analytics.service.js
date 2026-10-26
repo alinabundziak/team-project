@@ -76,15 +76,14 @@ class AnalyticsService {
 
       const activePricingPlan = await prisma.pricing_plans?.findFirst({
         where: { is_active: true },
-        orderBy: { created_at: 'desc' },
+        orderBy: { effective_from: 'desc' },
       }).catch(() => null);
 
       const activeMealRate = await prisma.meal_rates?.findFirst({
-        where: { is_active: true },
-        orderBy: { created_at: 'desc' },
+        orderBy: { daily_rate: 'desc' },
       }).catch(() => null);
 
-      const baseTuitionPrice = new Decimal(activePricingPlan?.price?.toString() || 15000);
+      const baseTuitionPrice = new Decimal(activePricingPlan?.amount?.toString() || 15000);
       const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
       const avgRevenuePerChild = baseTuitionPrice.mul(0.9).add(baseDailyMealFee.mul(22));
 
@@ -261,15 +260,14 @@ class AnalyticsService {
   async getRevenueForecast() {
     const activePricingPlan = await prisma.pricing_plans?.findFirst({
       where: { is_active: true },
-      orderBy: { created_at: 'desc' },
+      orderBy: { effective_from: 'desc' },
     }).catch(() => null);
 
     const activeMealRate = await prisma.meal_rates?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
+      orderBy: { daily_rate: 'desc' },
     }).catch(() => null);
 
-    const baseTuitionPrice = new Decimal(activePricingPlan?.price?.toString() || 15000);
+    const baseTuitionPrice = new Decimal(activePricingPlan?.amount?.toString() || 15000);
     const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
 
     const children = await prisma.children.findMany({
@@ -317,15 +315,14 @@ class AnalyticsService {
 
     const activePricingPlan = await prisma.pricing_plans?.findFirst({
       where: { is_active: true },
-      orderBy: { created_at: 'desc' },
+      orderBy: { effective_from: 'desc' },
     }).catch(() => null);
 
     const activeMealRate = await prisma.meal_rates?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
+      orderBy: { daily_rate: 'desc' },
     }).catch(() => null);
 
-    const baseTuitionFromDb = new Decimal(activePricingPlan?.price?.toString() || 15000);
+    const baseTuitionFromDb = new Decimal(activePricingPlan?.amount?.toString() || 15000);
     const baseMealFeeFromDb = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
 
     const simulatedChildrenCount = targetChildrenPerGroup * targetGroupsCount;
