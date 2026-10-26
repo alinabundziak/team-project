@@ -44,7 +44,6 @@ function authorizeRoles(...allowedRoles) {
 }
 
 
-module.exports = {
-  authenticate,
-  authorizeRoles
-};
+module.exports = authenticate;
+module.exports.authenticate = authenticate;
+module.exports.authorizeRoles = authorizeRoles;
