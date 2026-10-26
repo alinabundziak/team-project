@@ -445,8 +445,7 @@ function loadGroupRoomService({
                         return {
                             id: 1,
                             ...data,
-                            educator_id: null,
-                            assistant_id: null,
+                            staff_assignments: [],
                             room: testRoom,
                             _count: {
                                 children: 0,
@@ -518,7 +517,7 @@ function loadGroupStaffService(position, assignedElsewhere = null) {
             findUnique: async () => null,
             create: async ({ data }) => ({
                 ...data,
-                assigned_at: new Date("2026-01-01T00:00:00.000Z")
+                created_at: new Date("2026-01-01T00:00:00.000Z")
             })
         }
     };

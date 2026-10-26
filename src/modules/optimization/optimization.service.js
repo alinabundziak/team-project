@@ -138,24 +138,9 @@ async function getOptimizationRecommendations() {
                         birth_date: true
                     }
                 },
-                employees_educator: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true,
-                        position: true
-                    }
-                },
-                employees_assistant: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true,
-                        position: true
-                    }
-                },
                 staff_assignments: {
                     select: {
+                        role: true,
                         employee: {
                             select: {
                                 id: true,
@@ -169,7 +154,7 @@ async function getOptimizationRecommendations() {
 
                 schedules: {
                     select: {
-                        employees: {
+                        teacher: {
                             select: {
                                 id: true,
                                 first_name: true,
@@ -316,23 +301,15 @@ async function getOptimizationRecommendations() {
     const assignedEmployeeIds = new Set();
 
     for (const group of groups) {
-        if (group.educator_id != null) {
-            assignedEmployeeIds.add(group.educator_id);
-        }
-
-        if (group.assistant_id != null) {
-            assignedEmployeeIds.add(group.assistant_id);
-        }
-
-        for (const assignment of (group.staff_assignments || [])) {
+        for (const assignment of group.staff_assignments || []) {
             if (assignment.employee) {
                 assignedEmployeeIds.add(assignment.employee.id);
             }
         }
 
-        for (const schedule of (group.schedules || [])) {
-            if (schedule.employees) {
-                assignedEmployeeIds.add(schedule.employees.id);
+        for (const schedule of group.schedules || []) {
+            if (schedule.teacher) {
+                assignedEmployeeIds.add(schedule.teacher.id);
             }
         }
     }
@@ -346,40 +323,27 @@ async function getOptimizationRecommendations() {
     for (const group of groups) {
         const staffById = new Map();
 
-        if (group.employees_educator) {
-            staffById.set(group.employees_educator.id, {
-                ...group.employees_educator,
-                assignmentSource: "EDUCATOR_SLOT"
-            });
-        }
-
-        if (group.employees_assistant) {
-            staffById.set(group.employees_assistant.id, {
-                ...group.employees_assistant,
-                assignmentSource: "ASSISTANT_SLOT"
-            });
-        }
-
-        for (const assignment of (group.staff_assignments || [])) {
+        for (const assignment of group.staff_assignments || []) {
             const employee = assignment.employee;
+
             if (!employee) {
                 continue;
             }
 
-            const existing = staffById.get(employee.id);
-            if (!existing) {
-                staffById.set(employee.id, {
-                    ...employee,
-                    assignmentSource: "STAFF_ASSIGNMENT"
-                });
-            }
+            staffById.set(employee.id, {
+                ...employee,
+                role: assignment.role ?? employee.position,
+                assignmentSource: "STAFF_ASSIGNMENT"
+            });
         }
 
-        for (const schedule of (group.schedules || [])) {
-            const employee = schedule.employees;
+        for (const schedule of group.schedules || []) {
+            const employee = schedule.teacher;
+
             if (employee && !staffById.has(employee.id)) {
                 staffById.set(employee.id, {
                     ...employee,
+                    role: employee.position,
                     assignmentSource: "SCHEDULE"
                 });
             }
@@ -414,7 +378,6 @@ async function getOptimizationRecommendations() {
                     employee.position === position &&
                     !reservedEmployeeIds.has(employee.id)
             );
-
             if (!availableEmployee) {
                 continue;
             }

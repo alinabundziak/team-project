@@ -104,7 +104,7 @@ test("не дозволяє видалити працівника з пов'яз
         groups: { count: async () => 1 },
         schedules: { count: async () => 0 },
         teacher_activities: { count: async () => 0, findMany: async () => [] },
-        staff_assignments: { count: async () => 0 }
+        staff_assignments: { count: async () => 1 }
     };
 
     const service = proxyquire(
@@ -346,7 +346,7 @@ test("не дозволяє змінити посаду працівника, п
             })
         },
         groups: { count: async () => 1 },
-        staff_assignments: { count: async () => 0 },
+        staff_assignments: { count: async () => 1 },
         schedules: { count: async () => 0 },
         teacher_activities: { count: async () => 0 }
     };
@@ -386,7 +386,7 @@ test("не дозволяє змінити посаду призначеного
             })
         },
         groups: { count: async () => 1 },
-        staff_assignments: { count: async () => 0 },
+        staff_assignments: { count: async () => 1 },
         schedules: { count: async () => 0 },
         teacher_activities: { count: async () => 0 }
     };
@@ -420,12 +420,12 @@ test("не дозволяє змінити предмет викладача, п
         },
         teacher_activities: {
             findMany: async () => [
-                { activities: { name: "Музика" } }
+                { activity: { name: "Музика" } }
             ],
             count: async () => 1
         },
         groups: { count: async () => 0 },
-        staff_assignments: { count: async () => 0 },
+        staff_assignments: { count: async () => 1 },
         schedules: { count: async () => 0 }
     };
 
@@ -781,8 +781,6 @@ function makeGroup(id, options = {}) {
         target_age: 4,
         capacity: 20,
         children: [],
-        employees_educator: null,
-        employees_assistant: null,
         staff_assignments: [],
         schedules: [],
         ...options
@@ -799,14 +797,14 @@ function prepareData() {
     groupsData = [
         makeGroup(1, {
             children: [{ id: 101 }],
-            employees_educator: educator1,
-            employees_assistant: assistant1,
             staff_assignments: [
-                { employee: teacher1 }
+                { role: "EDUCATOR", employee: educator1 },
+                { role: "ASSISTANT", employee: assistant1 },
+                { role: null, employee: teacher1 }
             ],
             schedules: [
-                { employees: educator1 },
-                { employees: educator2 }
+                { teacher: educator1 },
+                { teacher: educator2 }
             ]
         }),
         makeGroup(2)

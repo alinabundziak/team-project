@@ -110,19 +110,10 @@ async function updateStaff(id, data, includeSalary = false) {
         data.position !== existingStaff.position
     ) {
         const [
-            groupsCount,
             schedulesCount,
             activitiesCount,
             assignmentsCount
         ] = await Promise.all([
-            prisma.groups.count({
-                where: {
-                    OR: [
-                        { educator_id: id },
-                        { assistant_id: id }
-                    ]
-                }
-            }),
             prisma.schedules.count({
                 where: { teacher_id: id }
             }),
@@ -135,7 +126,6 @@ async function updateStaff(id, data, includeSalary = false) {
         ]);
 
         if (
-            groupsCount > 0 ||
             schedulesCount > 0 ||
             activitiesCount > 0 ||
             assignmentsCount > 0
@@ -156,7 +146,7 @@ async function updateStaff(id, data, includeSalary = false) {
                 await prisma.teacher_activities.findMany({
                     where: { employee_id: id },
                     select: {
-                        activities: {
+                        activity: {
                             select: { name: true }
                         }
                     }
@@ -168,10 +158,10 @@ async function updateStaff(id, data, includeSalary = false) {
                     : "";
 
             const hasMismatchedActivity = activityAssignments.some(
-                ({ activities }) =>
+                ({ activity }) =>
                     !newSubject ||
                     newSubject !==
-                        activities.name.trim().toLocaleLowerCase("uk-UA")
+                        activity.name.trim().toLocaleLowerCase("uk-UA")
             );
 
             if (hasMismatchedActivity) {
@@ -237,41 +227,22 @@ async function deleteStaff(id) {
     }
 
     const [
-        groupsCount,
         schedulesCount,
         activitiesCount,
         assignmentsCount
     ] = await Promise.all([
-        prisma.groups.count({
-            where: {
-                OR: [
-                    { educator_id: id },
-                    { assistant_id: id }
-                ]
-            }
-        }),
-
         prisma.schedules.count({
-            where: {
-                teacher_id: id
-            }
+            where: { teacher_id: id }
         }),
-
         prisma.teacher_activities.count({
-            where: {
-                employee_id: id
-            }
+            where: { employee_id: id }
         }),
-
         prisma.staff_assignments.count({
-            where: {
-                employee_id: id
-            }
+            where: { employee_id: id }
         })
     ]);
 
     if (
-        groupsCount > 0 ||
         schedulesCount > 0 ||
         activitiesCount > 0 ||
         assignmentsCount > 0
@@ -302,25 +273,27 @@ async function getSalaryEstimates() {
             children: {
                 select: { id: true }
             },
-            employees_educator: {
+            staff_assignments: {
+                where: {
+                    role: {
+                        in: ["EDUCATOR", "ASSISTANT"]
+                    }
+                },
                 select: {
-                    id: true,
-                    first_name: true,
-                    last_name: true
-                }
-            },
-            employees_assistant: {
-                select: {
-                    id: true,
-                    first_name: true,
-                    last_name: true
+                    role: true,
+                    employee: {
+                        select: {
+                            id: true,
+                            first_name: true,
+                            last_name: true
+                        }
+                    }
                 }
             }
         },
         orderBy: { id: "asc" }
     });
 
-    // Кошторис визначається формулою завдання, а не фактичними призначеннями.
     const payrollEstimate =
         await payrollService.getKindergartenSalaryEstimate(groups);
 
@@ -330,6 +303,11 @@ async function getSalaryEstimates() {
 
     const groupEstimates = groups.map(group => {
         const estimate = estimatedGroupsById.get(group.id);
+        const assignments = group.staff_assignments || [];
+        const educator =
+            assignments.find(item => item.role === "EDUCATOR")?.employee ?? null;
+        const assistant =
+            assignments.find(item => item.role === "ASSISTANT")?.employee ?? null;
 
         return {
             groupId: group.id,
@@ -337,16 +315,16 @@ async function getSalaryEstimates() {
             room: group.room,
             childrenCount: group.children.length,
             educator: {
-                id: group.employees_educator?.id ?? null,
-                fullName: group.employees_educator
-                    ? `${group.employees_educator.first_name} ${group.employees_educator.last_name}`
+                id: educator?.id ?? null,
+                fullName: educator
+                    ? `${educator.first_name} ${educator.last_name}`
                     : null,
                 monthlySalary: estimate.educatorMonthlySalary
             },
             assistant: {
-                id: group.employees_assistant?.id ?? null,
-                fullName: group.employees_assistant
-                    ? `${group.employees_assistant.first_name} ${group.employees_assistant.last_name}`
+                id: assistant?.id ?? null,
+                fullName: assistant
+                    ? `${assistant.first_name} ${assistant.last_name}`
                     : null,
                 monthlySalary: estimate.assistantMonthlySalary
             },
@@ -361,7 +339,8 @@ async function getSalaryEstimates() {
         groups: groupEstimates,
         staffCosts: {
             teachersCount: payrollEstimate.teachersCount,
-            monthlySalaryPerTeacher: payrollEstimate.monthlySalaryPerTeacher ?? 40000,
+            monthlySalaryPerTeacher:
+                payrollEstimate.monthlySalaryPerTeacher ?? 40000,
             teachersMonthlySalary: payrollEstimate.teachersMonthlySalary,
             managerCount: 1,
             managerMonthlySalary: payrollEstimate.managerMonthlySalary
@@ -398,26 +377,9 @@ async function getStaffDistributionAnalysis(options = {}) {
                     select: { id: true }
                 },
 
-                employees_educator: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true,
-                        position: true
-                    }
-                },
-
-                employees_assistant: {
-                    select: {
-                        id: true,
-                        first_name: true,
-                        last_name: true,
-                        position: true
-                    }
-                },
-
                 staff_assignments: {
                     select: {
+                        role: true,
                         employee: {
                             select: {
                                 id: true,
@@ -431,7 +393,7 @@ async function getStaffDistributionAnalysis(options = {}) {
 
                 schedules: {
                     select: {
-                        employees: {
+                        teacher: {
                             select: {
                                 id: true,
                                 first_name: true,
@@ -463,7 +425,7 @@ async function getStaffDistributionAnalysis(options = {}) {
     const groupAnalysis = groups.map(group => {
         const groupStaff = new Map();
 
-        function addStaff(employee, assignmentType) {
+        function addStaff(employee, assignmentType, role) {
             if (!employee) {
                 return;
             }
@@ -471,46 +433,34 @@ async function getStaffDistributionAnalysis(options = {}) {
             if (!groupStaff.has(employee.id)) {
                 groupStaff.set(employee.id, {
                     id: employee.id,
-
-                    fullName:
-                        `${employee.first_name} ${employee.last_name}`,
-
+                    fullName: `${employee.first_name} ${employee.last_name}`,
                     position: employee.position,
+                    role: role ?? employee.position,
                     assignmentTypes: []
                 });
             }
 
             const staffMember = groupStaff.get(employee.id);
 
-            if (
-                !staffMember.assignmentTypes.includes(assignmentType)
-            ) {
+            if (!staffMember.assignmentTypes.includes(assignmentType)) {
                 staffMember.assignmentTypes.push(assignmentType);
             }
         }
 
-        addStaff(
-            group.employees_educator,
-            "EDUCATOR_SLOT"
-        );
+        for (const assignment of group.staff_assignments || []) {
+            const role = assignment.role ?? assignment.employee?.position;
+            const assignmentType =
+                role === "EDUCATOR"
+                    ? "EDUCATOR_SLOT"
+                    : role === "ASSISTANT"
+                        ? "ASSISTANT_SLOT"
+                        : "STAFF_ASSIGNMENT";
 
-        addStaff(
-            group.employees_assistant,
-            "ASSISTANT_SLOT"
-        );
-
-        for (const assignment of (group.staff_assignments || [])) {
-            addStaff(
-                assignment.employee,
-                "STAFF_ASSIGNMENT"
-            );
+            addStaff(assignment.employee, assignmentType, role);
         }
 
-        for (const schedule of (group.schedules || [])) {
-            addStaff(
-                schedule.employees,
-                "SCHEDULE"
-            );
+        for (const schedule of group.schedules || []) {
+            addStaff(schedule.teacher, "SCHEDULE");
         }
 
         const assignedStaff = [...groupStaff.values()];
@@ -529,11 +479,11 @@ async function getStaffDistributionAnalysis(options = {}) {
         }
 
         const educatorsCount = assignedStaff.filter(
-            employee => employee.position === "EDUCATOR"
+            employee => employee.role === "EDUCATOR"
         ).length;
 
         const assistantsCount = assignedStaff.filter(
-            employee => employee.position === "ASSISTANT"
+            employee => employee.role === "ASSISTANT"
         ).length;
 
         function getRoleStatus(actual) {

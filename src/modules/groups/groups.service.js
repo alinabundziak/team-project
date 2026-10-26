@@ -27,14 +27,20 @@ function createServiceError(message, code, status) {
 }
 
 function formatGroup(group) {
+    const assignments = group.staff_assignments || [];
+
     return {
         id: group.id,
         name: group.name,
         ageYears: group.target_age,
         capacity: group.capacity,
         roomId: group.room_id,
-        educatorId: group.educator_id,
-        assistantId: group.assistant_id,
+        educatorId:
+            assignments.find(assignment => assignment.role === "EDUCATOR")
+                ?.employee_id ?? null,
+        assistantId:
+            assignments.find(assignment => assignment.role === "ASSISTANT")
+                ?.employee_id ?? null,
         room: group.room,
         childrenCount: group._count.children,
         staffAssignmentsCount: group._count.staff_assignments,
@@ -149,7 +155,7 @@ async function getGroupsOccupancy() {
     return groups.map(group => {
         const childrenCount = group._count.children;
         const groupCapacity = group.capacity;
-        const roomCapacity = group.room.capacity;
+        const roomCapacity = group.room?.capacity ?? groupCapacity;
 
         return {
             groupId: group.id,
@@ -157,18 +163,20 @@ async function getGroupsOccupancy() {
             ageYears: group.target_age,
             childrenCount,
             groupCapacity,
-            room: {
-                id: group.room.id,
-                name: group.room.name,
-                capacity: roomCapacity
-            },
+            room: group.room
+                ? {
+                    id: group.room.id,
+                    name: group.room.name,
+                    capacity: group.room.capacity
+                }
+                : null,
             occupancyPercent: groupCapacity > 0
-                ? Math.round(
-                    childrenCount / groupCapacity * 10000
-                ) / 100
+                ? Math.round(childrenCount / groupCapacity * 10000) / 100
                 : null,
             exceedsGroupCapacity: childrenCount > groupCapacity,
-            exceedsRoomCapacity: childrenCount > roomCapacity,
+            exceedsRoomCapacity:
+                group.room?.capacity != null &&
+                childrenCount > group.room.capacity,
             isOverCapacity:
                 childrenCount > groupCapacity ||
                 childrenCount > roomCapacity
@@ -472,7 +480,7 @@ async function addChildToGroup(groupId, childId) {
 
     const maxCapacity = Math.min(
         group.capacity ?? 20,
-        group.room.capacity,
+        group.room.capacity ?? group.capacity ?? 20,
         20
     );
 
@@ -547,11 +555,14 @@ async function assignStaffToGroup(groupId, staffId) {
     const [group, staff] = await Promise.all([
         prisma.groups.findUnique({
             where: { id: groupId },
-            select: { id: true, position: true}
+            select: { id: true }
         }),
         prisma.employees.findUnique({
             where: { id: staffId },
-            select: { id: true, position: true}
+            select: {
+                id: true,
+                position: true
+            }
         })
     ]);
 
@@ -583,10 +594,16 @@ async function assignStaffToGroup(groupId, staffId) {
         where: {
             id: { not: groupId },
             OR: [
-                { educator_id: staffId },
-                { assistant_id: staffId },
-                { staff_assignments: { some: { employee_id: staffId } } },
-                { schedules: { some: { teacher_id: staffId } } }
+                {
+                    staff_assignments: {
+                        some: { employee_id: staffId }
+                    }
+                },
+                {
+                    schedules: {
+                        some: { teacher_id: staffId }
+                    }
+                }
             ]
         },
         select: { id: true }
@@ -621,19 +638,22 @@ async function assignStaffToGroup(groupId, staffId) {
     const assignment = await prisma.staff_assignments.create({
         data: {
             employee_id: staffId,
-            group_id: groupId
+            group_id: groupId,
+            role: staff.position
         },
         select: {
             employee_id: true,
             group_id: true,
-            assigned_at: true
+            role: true,
+            created_at: true
         }
     });
 
     return {
         staffId: assignment.employee_id,
         groupId: assignment.group_id,
-        assignedAt: assignment.assigned_at
+        role: assignment.role,
+        assignedAt: assignment.created_at
     };
 }
 

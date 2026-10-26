@@ -69,10 +69,6 @@ test("не рекомендує додаткову групу, якщо наяв
         capacity: 10,
         room: { id: 1, name: "Кімната", capacity: 10 },
         children,
-        employees_educator: null,
-        employees_assistant: null,
-        educator_id: null,
-        assistant_id: null,
         staff_assignments: [],
         schedules: []
     }];
@@ -97,10 +93,6 @@ test("враховує місткість кімнати при рекоменд
         capacity: 20,
         room: { id: 1, name: "Мала кімната", capacity: 10 },
         children,
-        employees_educator: null,
-        employees_assistant: null,
-        educator_id: null,
-        assistant_id: null,
         staff_assignments: [],
         schedules: []
     }];
@@ -138,8 +130,6 @@ test("пропонує перерозподіл дітей до групи ві�
                 last_name: String(i + 1),
                 birth_date: new Date("2023-01-01")
             })),
-            employees_educator: null,
-            employees_assistant: null,
             staff_assignments: []
         },
         {
@@ -154,8 +144,6 @@ test("пропонує перерозподіл дітей до групи ві�
                 last_name: String(i + 20),
                 birth_date: new Date("2023-02-01")
             })),
-            employees_educator: null,
-            employees_assistant: null,
             staff_assignments: []
         }
     ];
@@ -184,8 +172,6 @@ test("пропонує працівника потрібної посади дл
             capacity: 15,
             room: { id: 1, name: "Кімната 1", capacity: 15 },
             children: [],
-            employees_educator: null,
-            employees_assistant: null,
             staff_assignments: []
         }
     ];
@@ -273,10 +259,6 @@ test("не рекомендує переводити дитину до груп�
             capacity: 25,
             room: { id: 1, name: "Кімната 1", capacity: 25 },
             children: sourceChildren,
-            employees_educator: null,
-            employees_assistant: null,
-            educator_id: null,
-            assistant_id: null,
             staff_assignments: [],
             schedules: []
         },
@@ -287,10 +269,6 @@ test("не рекомендує переводити дитину до груп�
             capacity: 25,
             room: { id: 2, name: "Кімната 2", capacity: 25 },
             children: targetChildren,
-            employees_educator: null,
-            employees_assistant: null,
-            educator_id: null,
-            assistant_id: null,
             staff_assignments: [],
             schedules: []
         }

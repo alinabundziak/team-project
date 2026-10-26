@@ -56,20 +56,21 @@ async function getGroupPayroll(groupId) {
             children: {
                 select: { id: true }
             },
-            employees_educator: {
+            staff_assignments: {
+                where: {
+                    role: {
+                        in: ["EDUCATOR", "ASSISTANT"]
+                    }
+                },
                 select: {
-                    id: true,
-                    first_name: true,
-                    last_name: true,
-                    position: true
-                }
-            },
-            employees_assistant: {
-                select: {
-                    id: true,
-                    first_name: true,
-                    last_name: true,
-                    position: true
+                    role: true,
+                    employee: {
+                        select: {
+                            id: true,
+                            first_name: true,
+                            last_name: true
+                        }
+                    }
                 }
             }
         }
@@ -82,14 +83,19 @@ async function getGroupPayroll(groupId) {
     }
 
     const settings = await expenseSettingsService.getExpenseSettings();
-
     const childrenCount = group.children.length;
+    const assignments = group.staff_assignments || [];
 
-    const educatorSalary = group.employees_educator
+    const educator =
+        assignments.find(item => item.role === "EDUCATOR")?.employee ?? null;
+    const assistant =
+        assignments.find(item => item.role === "ASSISTANT")?.employee ?? null;
+
+    const educatorSalary = educator
         ? calculateSalary("EDUCATOR", childrenCount, settings)
         : 0;
 
-    const assistantSalary = group.employees_assistant
+    const assistantSalary = assistant
         ? calculateSalary("ASSISTANT", childrenCount, settings)
         : 0;
 
@@ -97,17 +103,17 @@ async function getGroupPayroll(groupId) {
         groupId: group.id,
         groupName: group.name,
         childrenCount,
-        educator: group.employees_educator
+        educator: educator
             ? {
-                id: group.employees_educator.id,
-                fullName: `${group.employees_educator.first_name} ${group.employees_educator.last_name}`,
+                id: educator.id,
+                fullName: `${educator.first_name} ${educator.last_name}`,
                 monthlySalary: educatorSalary
             }
             : null,
-        assistant: group.employees_assistant
+        assistant: assistant
             ? {
-                id: group.employees_assistant.id,
-                fullName: `${group.employees_assistant.first_name} ${group.employees_assistant.last_name}`,
+                id: assistant.id,
+                fullName: `${assistant.first_name} ${assistant.last_name}`,
                 monthlySalary: assistantSalary
             }
             : null,
@@ -185,16 +191,15 @@ async function getKindergartenPayroll() {
                 children: {
                     select: { id: true }
                 },
-                employees_educator: {
+                staff_assignments: {
                     select: {
-                        id: true,
-                        position: true
-                    }
-                },
-                employees_assistant: {
-                    select: {
-                        id: true,
-                        position: true
+                        employee_id: true,
+                        role: true,
+                        employee: {
+                            select: {
+                                position: true
+                            }
+                        }
                     }
                 }
             },
@@ -217,18 +222,15 @@ async function getKindergartenPayroll() {
     for (const group of groups) {
         const childrenCount = group.children.length;
 
-        if (group.employees_educator) {
-            employeeSalaries.set(
-                group.employees_educator.id,
-                calculateSalary("EDUCATOR", childrenCount, settings)
-            );
-        }
+        for (const assignment of group.staff_assignments || []) {
+            const role = assignment.role ?? assignment.employee?.position;
 
-        if (group.employees_assistant) {
-            employeeSalaries.set(
-                group.employees_assistant.id,
-                calculateSalary("ASSISTANT", childrenCount, settings)
-            );
+            if (role === "EDUCATOR" || role === "ASSISTANT") {
+                employeeSalaries.set(
+                    assignment.employee_id,
+                    calculateSalary(role, childrenCount, settings)
+                );
+            }
         }
     }
 
@@ -239,6 +241,10 @@ async function getKindergartenPayroll() {
             salary = employeeSalaries.has(employee.id)
                 ? employeeSalaries.get(employee.id)
                 : 0;
+        } else if (employee.position === "ASSISTANT") {
+            salary = employeeSalaries.has(employee.id)
+                ? employeeSalaries.get(employee.id)
+                : calculateSalary("ASSISTANT", 0, settings);
         } else {
             salary = calculateSalary(employee.position, 0, settings);
         }

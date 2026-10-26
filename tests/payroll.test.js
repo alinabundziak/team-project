@@ -34,24 +34,31 @@ test("розраховує загальні витрати на персонал
             name: "Перша група",
             room: { id: 1, name: "Кімната 1" },
             children: [{ id: 1 }, { id: 2 }],
-            employees_educator: {
-                id: 1,
-                first_name: "Олена",
-                last_name: "Іваненко"
-            },
-            employees_assistant: {
-                id: 2,
-                first_name: "Ірина",
-                last_name: "Петренко"
-            }
+            staff_assignments: [
+                {
+                    role: "EDUCATOR",
+                    employee: {
+                        id: 1,
+                        first_name: "Олена",
+                        last_name: "Іваненко"
+                    }
+                },
+                {
+                    role: "ASSISTANT",
+                    employee: {
+                        id: 2,
+                        first_name: "Ірина",
+                        last_name: "Петренко"
+                    }
+                }
+            ]
         },
         {
             id: 2,
             name: "Друга група",
             room: { id: 2, name: "Кімната 2" },
             children: [{ id: 3 }],
-            employees_educator: null,
-            employees_assistant: null
+            staff_assignments: []
         }
     ];
 
@@ -189,16 +196,14 @@ test("кошторис додає оренду за кількістю груп,
             name: "Група 1",
             room: { id: 10, name: "Кімната 10" },
             children: Array.from({ length: 15 }, (_, index) => ({ id: index + 1 })),
-            employees_educator: null,
-            employees_assistant: null
+            staff_assignments: []
         },
         {
             id: 2,
             name: "Група 2",
             room: { id: 11, name: "Кімната 11" },
             children: Array.from({ length: 10 }, (_, index) => ({ id: index + 101 })),
-            employees_educator: null,
-            employees_assistant: null
+            staff_assignments: []
         }
     ];
 

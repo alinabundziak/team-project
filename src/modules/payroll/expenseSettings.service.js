@@ -144,7 +144,9 @@ async function updateExpenseSettings(patch) {
         }
     }
 
-    await prisma.$transaction(operations);
+    for (const operation of operations) {
+        await operation;
+    }
     return settings;
 }
 
