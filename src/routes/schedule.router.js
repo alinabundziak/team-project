@@ -21,7 +21,6 @@ const asyncHandler = fn => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// Захищаємо всі маршрути
 router.use(authenticate);
 
 
@@ -152,7 +151,7 @@ router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), vali
     room_id: req.body.room_id ? Number(req.body.room_id) : existing.room_id,
     day_of_week: req.body.day_of_week ? String(req.body.day_of_week) : existing.day_of_week,
     start_time: req.body.start_time || `${String(existing.start_time.getUTCHours()).padStart(2, '0')}:${String(existing.start_time.getUTCMinutes()).padStart(2, '0')}`,
-    end_time: req.body.end_time || `${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}:${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}`
+    end_time: req.body.end_time || `${String(existing.end_time.getUTCHours()).padStart(2, '0')}:${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}`
   };
 
   const conflictCheck = await checkScheduleConflicts({
