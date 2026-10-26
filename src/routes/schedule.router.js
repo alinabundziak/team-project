@@ -4,14 +4,24 @@ const prisma = require('../config/prisma');
 const { checkScheduleConflicts, generateDraftSchedule } = require('../services/schedule.service');
 const { validateActivity, validateScheduleCreate, validateScheduleUpdate } = require('../validators/schedule.validator');
 
-// Підключаємо авторизаційний middleware Софії
-const { authenticate, authorizeRoles } = require('../middlewares/auth');
+const authModule = require('../middleware/authenticate');
+
+
+const authenticate = typeof authModule === 'function' ? authModule : authModule.authenticate;
+const authorizeRoles = authModule.authorizeRoles || function(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Доступ заборонено: недостатньо прав' });
+    }
+    next();
+  };
+};
 
 const asyncHandler = fn => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// Захищаємо всі маршрути розкладу та занять
+// Захищаємо всі маршрути
 router.use(authenticate);
 
 
@@ -131,7 +141,7 @@ router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), vali
     if (!employee || employee.id !== existing.teacher_id) {
       return res.status(403).json({ error: 'Викладач може редагувати тільки власні заняття' });
     }
-    // ЗАБОРОНА ЗМІНИ TEACHER_ID ДЛЯ ВИКЛАДАЧА:
+    // Фіксація teacher_id для викладача
     targetTeacherId = employee.id;
   }
 
@@ -142,7 +152,7 @@ router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), vali
     room_id: req.body.room_id ? Number(req.body.room_id) : existing.room_id,
     day_of_week: req.body.day_of_week ? String(req.body.day_of_week) : existing.day_of_week,
     start_time: req.body.start_time || `${String(existing.start_time.getUTCHours()).padStart(2, '0')}:${String(existing.start_time.getUTCMinutes()).padStart(2, '0')}`,
-    end_time: req.body.end_time || `${String(existing.end_time.getUTCHours()).padStart(2, '0')}:${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}`
+    end_time: req.body.end_time || `${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}:${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}`
   };
 
   const conflictCheck = await checkScheduleConflicts({
