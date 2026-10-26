@@ -1,6 +1,14 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  CANCELLED
 }
 
 generator client {
@@ -136,6 +144,31 @@ model rules {
   description      String?  @db.Text
   is_active        Boolean? @default(true)
   created_at       DateTime @default(now())
+model children {
+  id             Int              @id @default(autoincrement())
+  first_name     String           @db.VarChar(100)
+  last_name      String           @db.VarChar(100)
+  birth_date     DateTime         @db.Date
+  group_id       Int?
+  parent_id      Int?
+  discount_id    Int?             @default(1)
+  discounts      discounts?       @relation(fields: [discount_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  groups         groups?          @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  parents        parents?         @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  charges        charges[]
+  payments       payments[]
+  subscriptions  subscriptions[]
+  child_benefits child_benefits[]
+}
+
+model discounts {
+  id             Int              @id @default(autoincrement())
+  code           String?          @unique @db.VarChar(50)
+  name           String?          @db.VarChar(100)
+  description    String?          @db.VarChar(255)
+  percentage     Decimal          @default(0.00) @db.Decimal(5, 2)
+  children       children[]
+  child_benefits child_benefits[]
 }
 
 
@@ -220,6 +253,7 @@ model child_benefits {
   child        children @relation(fields: [child_id], references: [id], onDelete: Cascade)
 }
 
+
 model charges {
   id                 Int           @id @default(autoincrement())
   child_id           Int
@@ -231,30 +265,57 @@ model charges {
   meal_days          Int
   meal_amount        Decimal       @db.Decimal(10, 2)
   total_amount       Decimal       @db.Decimal(10, 2)
-  created_at         DateTime      @default(now())
-
+  amount             Decimal?      @db.Decimal(10, 2)
+  created_at         DateTime?     @default(now()) @db.Timestamp(6)
+  adjustments        adjustments[]
+  children           children      @relation(fields: [child_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   child              children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
   adjustments        adjustments[]
 }
 
 model payments {
-  id         Int       @id @default(autoincrement())
-  child_id   Int
-  amount     Decimal   @db.Decimal(10, 2)
-  created_at DateTime  @default(now())
-
-  child      children  @relation(fields: [child_id], references: [id], onDelete: Cascade)
-  refunds    refunds[]
+  id                 Int           @id @default(autoincrement())
+  child_id           Int
+  period             String?       @db.VarChar(20)
+  due_date           DateTime?     @db.Timestamp(6)
+  base_education_fee Decimal?      @db.Decimal(10, 2)
+  benefit_percentage Decimal?      @default(0.00) @db.Decimal(5, 2)
+  annual_discount    Decimal?      @default(0.00) @db.Decimal(5, 2)
+  education_amount   Decimal?      @db.Decimal(10, 2)
+  meal_amount        Decimal?      @db.Decimal(10, 2)
+  total_amount       Decimal?      @db.Decimal(10, 2)
+  paid_amount        Decimal?      @default(0.00) @db.Decimal(10, 2)
+  amount             Decimal?      @db.Decimal(10, 2)
+  status             PaymentStatus @default(PENDING)
+  created_at         DateTime?     @default(now()) @db.Timestamp(6)
+  children           children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  refunds            refunds[]
 }
 
 model refunds {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   payment_id Int
-  amount     Decimal  @db.Decimal(10, 2)
-  reason     String?  @db.VarChar(255)
-  created_at DateTime @default(now())
+  amount     Decimal   @db.Decimal(10, 2)
+  reason     String?   @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  payments   payments  @relation(fields: [payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
 
-  payment    payments @relation(fields: [payment_id], references: [id], onDelete: Cascade)
+model tariffs {
+  id         Int       @id @default(autoincrement())
+  code       String    @db.VarChar(30)
+  amount     Decimal   @db.Decimal(10, 2)
+  valid_from DateTime  @db.Date
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([code, valid_from])
+}
+
+model meal_rates {
+  id         Int       @id @default(autoincrement())
+  age        Int       @unique
+  daily_rate Decimal   @db.Decimal(10, 2)
+  valid_from DateTime? @db.Date
 }
 
 model adjustments {
@@ -285,4 +346,41 @@ model expenses {
   description String?   @db.Text
   date        DateTime  @default(now()) @db.Date
   created_at  DateTime? @db.Timestamptz
+}
+
+model child_benefits {
+  id             Int       @id @default(autoincrement())
+  child_id       Int
+  discount_id    Int?
+  benefit_type   String?   @db.VarChar(100)
+  effective_from DateTime? @default(now()) @db.Timestamp(6)
+  effective_to   DateTime? @db.Timestamp(6)
+  is_active      Boolean?  @default(true)
+
+  children  children   @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  discounts discounts? @relation(fields: [discount_id], references: [id], onDelete: Restrict)
+}
+
+model meal_plans {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(100)
+}
+
+model pricing_plans {
+  id             Int       @id @default(autoincrement())
+  name           String    @db.VarChar(100)
+  amount         Decimal?  @db.Decimal(10, 2)
+  monthly_fee    Decimal?  @db.Decimal(10, 2)
+  effective_from DateTime? @default(now()) @db.Timestamp(6)
+  effective_to   DateTime? @db.Timestamp(6)
+  is_active      Boolean?  @default(true)
+}
+
+model expenses {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(150)
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String   @db.VarChar(50)
+  date        DateTime @default(now())
+  isEstimated Boolean  @default(false)
 }

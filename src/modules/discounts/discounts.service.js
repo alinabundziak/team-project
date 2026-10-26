@@ -15,13 +15,18 @@ function toDiscountDto(d) {
     id: d.id,
     code: d.code,
     name: d.description || d.code,
-    percent: new Decimal(d.percent).toNumber(),
+    percent: new Decimal(d.percentage).toNumber(),
   };
 }
 
 async function listDiscounts() {
   const rows = await repo.findAll();
-  return { data: rows.filter((d) => isSupportedPercent(d.percent)).map(toDiscountDto) };
+
+  return {
+    data: rows
+      .filter((d) => isSupportedPercent(d.percentage))
+      .map(toDiscountDto)
+  };
 }
 
 module.exports = { listDiscounts, isSupportedPercent, toDiscountDto };
