@@ -9,7 +9,10 @@ const authModule = require('../middleware/authenticate');
 const authenticate = typeof authModule === 'function' ? authModule : authModule.authenticate;
 const authorizeRoles = authModule.authorizeRoles || function(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    const userRole = req.user && req.user.role ? req.user.role.toUpperCase() : '';
+    const normalizedAllowed = allowedRoles.map(r => r.toUpperCase());
+    
+    if (!req.user || !normalizedAllowed.includes(userRole)) {
       return res.status(403).json({ error: 'Доступ заборонено: недостатньо прав' });
     }
     next();
@@ -22,19 +25,18 @@ const asyncHandler = fn => (req, res, next) => {
 
 router.use(authenticate);
 
-
 router.get('/activities', asyncHandler(async (req, res) => {
   const list = await prisma.activities.findMany();
   res.json(list);
 }));
 
-router.post('/activities', authorizeRoles('Admin', 'Manager'), validateActivity, asyncHandler(async (req, res) => {
+router.post('/activities', authorizeRoles('ADMIN', 'MANAGER'), validateActivity, asyncHandler(async (req, res) => {
   const { name } = req.body;
   const activity = await prisma.activities.create({ data: { name } });
   res.status(201).json(activity);
 }));
 
-router.put('/activities/:id', authorizeRoles('Admin', 'Manager'), validateActivity, asyncHandler(async (req, res) => {
+router.put('/activities/:id', authorizeRoles('ADMIN', 'MANAGER'), validateActivity, asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const { name } = req.body;
   const updated = await prisma.activities.update({
@@ -44,7 +46,7 @@ router.put('/activities/:id', authorizeRoles('Admin', 'Manager'), validateActivi
   res.json(updated);
 }));
 
-router.delete('/activities/:id', authorizeRoles('Admin', 'Manager'), asyncHandler(async (req, res) => {
+router.delete('/activities/:id', authorizeRoles('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   await prisma.activities.delete({ where: { id } });
   res.status(204).send();
@@ -52,10 +54,10 @@ router.delete('/activities/:id', authorizeRoles('Admin', 'Manager'), asyncHandle
 
 
 router.get('/schedules', asyncHandler(async (req, res) => {
-  const { role, id: userId } = req.user;
+  const userId = req.user.id;
+  const userRole = req.user.role ? req.user.role.toUpperCase() : '';
 
-  if (role === 'Parent') {
-    // Точна відповідність зв'язку M:N через child_parents зі схеми
+  if (userRole === 'PARENT') {
     const parentRecord = await prisma.parents.findUnique({
       where: { user_id: userId },
       include: {
@@ -78,7 +80,7 @@ router.get('/schedules', asyncHandler(async (req, res) => {
     return res.json(schedules);
   }
 
-  if (role === 'Teacher') {
+  if (userRole === 'TEACHER') {
     const employee = await prisma.employees.findUnique({ where: { user_id: userId } });
     if (!employee) return res.status(404).json({ error: 'Профіль працівника не знайдено' });
 
@@ -89,7 +91,7 @@ router.get('/schedules', asyncHandler(async (req, res) => {
     return res.json(schedules);
   }
 
-  if (role === 'Admin' || role === 'Manager') {
+  if (userRole === 'ADMIN' || userRole === 'MANAGER') {
     const allSchedules = await prisma.schedules.findMany({
       include: { group: true, activity: true, teacher: true, room: true }
     });
@@ -99,10 +101,11 @@ router.get('/schedules', asyncHandler(async (req, res) => {
   return res.status(403).json({ error: 'Доступ заборонено: недостатньо прав для перегляду розкладу' });
 }));
 
-router.post('/schedules', authorizeRoles('Admin', 'Manager', 'Teacher'), validateScheduleCreate, asyncHandler(async (req, res) => {
+router.post('/schedules', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), validateScheduleCreate, asyncHandler(async (req, res) => {
   const { group_id, activity_id, teacher_id, room_id, day_of_week, start_time, end_time } = req.body;
+  const userRole = req.user.role ? req.user.role.toUpperCase() : '';
 
-  if (req.user.role === 'Teacher') {
+  if (userRole === 'TEACHER') {
     const employee = await prisma.employees.findUnique({ where: { user_id: req.user.id } });
     if (!employee || employee.id !== Number(teacher_id)) {
       return res.status(403).json({ error: 'Викладач може додавати тільки власні заняття' });
@@ -123,7 +126,7 @@ router.post('/schedules', authorizeRoles('Admin', 'Manager', 'Teacher'), validat
       activity_id: Number(activity_id),
       teacher_id: Number(teacher_id),
       room_id: Number(room_id),
-      day_of_week: String(day_of_week), // Зберігаємо як String відповідно до schema.prisma
+      day_of_week: String(day_of_week),
       start_time: new Date(`1970-01-01T${start_time}:00Z`),
       end_time: new Date(`1970-01-01T${end_time}:00Z`)
     }
@@ -132,14 +135,15 @@ router.post('/schedules', authorizeRoles('Admin', 'Manager', 'Teacher'), validat
   res.status(201).json(newSchedule);
 }));
 
-router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), validateScheduleUpdate, asyncHandler(async (req, res) => {
+router.put('/schedules/:id', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), validateScheduleUpdate, asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.schedules.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Запис розкладу не знайдено' });
 
+  const userRole = req.user.role ? req.user.role.toUpperCase() : '';
   let targetTeacherId = req.body.teacher_id ? Number(req.body.teacher_id) : existing.teacher_id;
 
-  if (req.user.role === 'Teacher') {
+  if (userRole === 'TEACHER') {
     const employee = await prisma.employees.findUnique({ where: { user_id: req.user.id } });
     if (!employee || employee.id !== existing.teacher_id) {
       return res.status(403).json({ error: 'Викладач може редагувати тільки власні заняття' });
@@ -182,12 +186,13 @@ router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), vali
   res.json(updated);
 }));
 
-router.delete('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), asyncHandler(async (req, res) => {
+router.delete('/schedules/:id', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.schedules.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Запис розкладу не знайдено' });
 
-  if (req.user.role === 'Teacher') {
+  const userRole = req.user.role ? req.user.role.toUpperCase() : '';
+  if (userRole === 'TEACHER') {
     const employee = await prisma.employees.findUnique({ where: { user_id: req.user.id } });
     if (!employee || employee.id !== existing.teacher_id) {
       return res.status(403).json({ error: 'Викладач може видаляти тільки власні заняття' });
@@ -198,7 +203,7 @@ router.delete('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), a
   res.status(204).send();
 }));
 
-router.post('/schedules/generate-draft', authorizeRoles('Admin', 'Manager'), asyncHandler(async (req, res) => {
+router.post('/schedules/generate-draft', authorizeRoles('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
   const { day_of_week, items } = req.body;
   if (!day_of_week || !Array.isArray(items)) {
     return res.status(400).json({ error: "Поля 'day_of_week' та 'items' (масив) обов'язкові" });
