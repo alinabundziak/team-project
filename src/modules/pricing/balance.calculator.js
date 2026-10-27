@@ -32,7 +32,7 @@ function calculateDebt({
     adjustmentsDecrease: dec.toFixed(2),
     paid: p.toFixed(2),
     refunded: r.toFixed(2),
-    debt: Decimal.max(d, zero).toFixed(2), 
+    debt: Decimal.max(d, zero).toFixed(2),
     overpayment: Decimal.max(d.negated(), zero).toFixed(2),
   };
 }

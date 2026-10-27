@@ -1,11 +1,12 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+generator client {
+  provider = "prisma-client-js"
+}
+
 
 model roles {
   id    Int     @id @default(autoincrement())
@@ -23,6 +24,7 @@ model users {
   phone         String?    @db.VarChar(50)
   is_active     Boolean?   @default(true)
   created_at    DateTime?  @default(now())
+
   role          roles?     @relation(fields: [role_id], references: [id])
   parents       parents?
   employees     employees?
@@ -34,6 +36,7 @@ model parents {
   first_name    String          @db.VarChar(100)
   last_name     String          @db.VarChar(100)
   phone         String?         @db.VarChar(50)
+
   user          users?          @relation(fields: [user_id], references: [id], onDelete: SetNull)
   child_parents child_parents[]
 }
@@ -46,6 +49,8 @@ model children {
   group_id       Int?
   discount_id    Int?             @default(1)
   parent_note    String?          @db.VarChar(500)
+
+
   group          groups?          @relation(fields: [group_id], references: [id], onDelete: SetNull)
   discount       discounts?       @relation(fields: [discount_id], references: [id], onDelete: SetNull)
   child_parents  child_parents[]
@@ -59,10 +64,14 @@ model child_parents {
   child_id   Int
   parent_id  Int
   created_at DateTime? @default(now())
+
   child      children  @relation(fields: [child_id], references: [id], onDelete: Cascade)
   parent     parents   @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+
   @@id([child_id, parent_id])
 }
+
+
 
 model groups {
   id                Int                 @id @default(autoincrement())
@@ -71,6 +80,7 @@ model groups {
   capacity          Int                 @default(20)
   room_id           Int?                @unique // 2. Унікальна кімната для групи
   created_at        DateTime?           @db.Timestamptz
+
   room              rooms?              @relation(fields: [room_id], references: [id], onDelete: SetNull)
   children          children[]
   staff_assignments staff_assignments[]
@@ -96,6 +106,7 @@ model employees {
   position           String               @db.VarChar(100)
   subject            String?              @db.VarChar(100)
   salary             Decimal              @default(40000.00) @db.Decimal(10, 2)
+
   user               users?               @relation(fields: [user_id], references: [id], onDelete: Restrict)
   staff_assignments  staff_assignments[]
   teacher_activities teacher_activities[]
@@ -108,8 +119,10 @@ model staff_assignments {
   group_id    Int
   role        String?    @db.VarChar(50)
   created_at  DateTime?  @db.Timestamptz
+
   employee    employees  @relation(fields: [employee_id], references: [id], onDelete: Cascade)
   group       groups     @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
 
   @@unique([employee_id, group_id])
 }
@@ -125,9 +138,12 @@ model rules {
   created_at       DateTime @default(now())
 }
 
+
+
 model activities {
   id                 Int                  @id @default(autoincrement())
   name               String               @db.VarChar(100)
+
   teacher_activities teacher_activities[]
   schedules          schedules[]
 }
@@ -136,6 +152,7 @@ model teacher_activities {
   id          Int        @id @default(autoincrement())
   employee_id Int
   activity_id Int
+
   employee    employees  @relation(fields: [employee_id], references: [id], onDelete: Cascade)
   activity    activities @relation(fields: [activity_id], references: [id], onDelete: Cascade)
 
@@ -152,11 +169,14 @@ model schedules {
   start_time  DateTime   @db.Time
   end_time    DateTime   @db.Time
   created_at  DateTime?  @db.Timestamptz
+
   group       groups     @relation(fields: [group_id], references: [id], onDelete: Cascade)
   activity    activities @relation(fields: [activity_id], references: [id], onDelete: Cascade)
   teacher     employees  @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
   room        rooms      @relation(fields: [room_id], references: [id], onDelete: Cascade)
 }
+
+
 
 model discounts {
   id          Int        @id @default(autoincrement())
@@ -195,6 +215,8 @@ model child_benefits {
   id           Int      @id @default(autoincrement())
   child_id     Int
   benefit_type String   @db.VarChar(255)
+
+
   child        children @relation(fields: [child_id], references: [id], onDelete: Cascade)
 }
 
@@ -210,6 +232,7 @@ model charges {
   meal_amount        Decimal       @db.Decimal(10, 2)
   total_amount       Decimal       @db.Decimal(10, 2)
   created_at         DateTime      @default(now())
+
   child              children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
   adjustments        adjustments[]
 }
@@ -251,6 +274,7 @@ model subscriptions {
   child_id   Int
   start_date DateTime  @db.Date
   end_date   DateTime? @db.Date
+
   child      children  @relation(fields: [child_id], references: [id], onDelete: Cascade)
 }
 
