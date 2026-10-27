@@ -70,10 +70,10 @@ async function checkScheduleConflicts({ group_id, activity_id, teacher_id, room_
   }
 
   const existingInDb = await prisma.schedules.findMany({
-    where: { day_of_week: String(day_of_week) }
+    where: { day_of_week: Number(day_of_week) }
   });
 
-  const allSchedules = [...existingInDb, ...additionalSchedules.filter(s => String(s.day_of_week) === String(day_of_week))];
+  const allSchedules = [...existingInDb, ...additionalSchedules.filter(s => Number(s.day_of_week) === Number(day_of_week))];
 
   for (const item of allSchedules) {
     if (excludeId && item.id && item.id === Number(excludeId)) continue;
@@ -142,7 +142,7 @@ function validateAgeBalanceWithDraft(groupsInDb, draft) {
 async function generateDraftSchedule({ day_of_week, items }) {
   const draft = [];
   const errors = [];
-  const dayStr = String(day_of_week);
+  const dayNumber = Number(day_of_week);
 
   const groupsInDb = await prisma.groups.findMany({
     include: { schedules: true }
@@ -204,7 +204,7 @@ async function generateDraftSchedule({ day_of_week, items }) {
 
       const check = await checkScheduleConflicts({
         group_id, activity_id, teacher_id, room_id,
-        day_of_week: dayStr,
+        day_of_week: dayNumber,
         start_time: minutesToTime(current),
         end_time: minutesToTime(slotEnd),
         additionalSchedules: draft
@@ -222,7 +222,7 @@ async function generateDraftSchedule({ day_of_week, items }) {
         activity_id: Number(activity_id),
         teacher_id: Number(teacher_id),
         room_id: Number(room_id),
-        day_of_week: dayStr,
+        day_of_week: dayNumber,
         start_time: minutesToDate(timeToMinutes(foundSlot.start)),
         end_time: minutesToDate(timeToMinutes(foundSlot.end)),
         formatted_start: foundSlot.start,

@@ -3,6 +3,20 @@ function isPositiveInteger(val) {
   return Number.isInteger(num) && num > 0;
 }
 
+function isValidDayOfWeek(value) {
+  if (typeof value !== 'number' && typeof value !== 'string') {
+    return false;
+  }
+
+  if (typeof value === 'string' && value.trim() === '') {
+    return false;
+  }
+
+  const day = Number(value);
+
+  return Number.isInteger(day) && day >= 1 && day <= 7;
+}
+
 function isValidTimeFormat(timeStr) {
   if (typeof timeStr !== 'string') return false;
   const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -25,9 +39,11 @@ function validateScheduleCreate(req, res, next) {
   if (!isPositiveInteger(teacher_id)) return res.status(400).json({ error: "teacher_id має бути додатним цілим числом" });
   if (!isPositiveInteger(room_id)) return res.status(400).json({ error: "room_id має бути додатним цілим числом" });
 
-  if (!day_of_week || (typeof day_of_week !== 'string' && typeof day_of_week !== 'number')) {
-    return res.status(400).json({ error: "Поле 'day_of_week' є обов'язковим" });
-  }
+  if (!isValidDayOfWeek(day_of_week)) {
+  return res.status(400).json({
+    error: "day_of_week має бути цілим числом від 1 до 7"
+  });
+}
 
   if (!isValidTimeFormat(start_time)) {
     return res.status(400).json({ error: "Некоректний формат 'start_time' (очікується HH:MM)" });
@@ -46,6 +62,11 @@ function validateScheduleUpdate(req, res, next) {
   if (activity_id !== undefined && !isPositiveInteger(activity_id)) return res.status(400).json({ error: "activity_id має бути додатним цілим числом" });
   if (teacher_id !== undefined && !isPositiveInteger(teacher_id)) return res.status(400).json({ error: "teacher_id має бути додатним цілим числом" });
   if (room_id !== undefined && !isPositiveInteger(room_id)) return res.status(400).json({ error: "room_id має бути додатним цілим числом" });
+  if (day_of_week !== undefined && !isValidDayOfWeek(day_of_week)) {
+  return res.status(400).json({
+    error: "day_of_week має бути цілим числом від 1 до 7"
+  });
+}
 
   if (start_time && !isValidTimeFormat(start_time)) {
     return res.status(400).json({ error: "Некоректний формат 'start_time' (очікується HH:MM)" });
@@ -59,6 +80,7 @@ function validateScheduleUpdate(req, res, next) {
 
 module.exports = {
   isPositiveInteger,
+  isValidDayOfWeek,
   isValidTimeFormat,
   validateActivity,
   validateScheduleCreate,
