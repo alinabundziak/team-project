@@ -61,21 +61,19 @@ router.get('/schedules', asyncHandler(async (req, res) => {
     const parentRecord = await prisma.parents.findUnique({
       where: { user_id: userId },
       include: {
-        child_parents: {
-          include: { child: true }
-        }
+        children: true
       }
     });
 
     if (!parentRecord) return res.status(404).json({ error: 'Профіль батьків не знайдено' });
 
-    const groupIds = parentRecord.child_parents
-      .map(cp => cp.child.group_id)
-      .filter(Boolean);
+    const groupIds = parentRecord.children
+      .map(child => child.group_id)
+      .filter(id => id != null);
 
     const schedules = await prisma.schedules.findMany({
       where: { group_id: { in: groupIds } },
-      include: { activity: true, room: true, teacher: true, group: true }
+      include: { activities: true, rooms: true, employees: true, groups: true }
     });
     return res.json(schedules);
   }
@@ -86,14 +84,14 @@ router.get('/schedules', asyncHandler(async (req, res) => {
 
     const schedules = await prisma.schedules.findMany({
       where: { teacher_id: employee.id },
-      include: { group: true, activity: true, room: true }
+      include: { groups: true, activities: true, rooms: true }
     });
     return res.json(schedules);
   }
 
   if (userRole === 'ADMIN' || userRole === 'MANAGER') {
     const allSchedules = await prisma.schedules.findMany({
-      include: { group: true, activity: true, teacher: true, room: true }
+      include: { groups: true, activities: true, employees: true, rooms: true }
     });
     return res.json(allSchedules);
   }
@@ -126,7 +124,7 @@ router.post('/schedules', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), validat
       activity_id: Number(activity_id),
       teacher_id: Number(teacher_id),
       room_id: Number(room_id),
-      day_of_week: String(day_of_week),
+      day_of_week: Number(day_of_week),
       start_time: new Date(`1970-01-01T${start_time}:00Z`),
       end_time: new Date(`1970-01-01T${end_time}:00Z`)
     }
@@ -156,7 +154,7 @@ router.put('/schedules/:id', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), vali
     activity_id: req.body.activity_id ? Number(req.body.activity_id) : existing.activity_id,
     teacher_id: targetTeacherId,
     room_id: req.body.room_id ? Number(req.body.room_id) : existing.room_id,
-    day_of_week: req.body.day_of_week ? String(req.body.day_of_week) : existing.day_of_week,
+    day_of_week: req.body.day_of_week != null ? Number(req.body.day_of_week) : existing.day_of_week,
     start_time: req.body.start_time || `${String(existing.start_time.getUTCHours()).padStart(2, '0')}:${String(existing.start_time.getUTCMinutes()).padStart(2, '0')}`,
     end_time: req.body.end_time || `${String(existing.end_time.getUTCHours()).padStart(2, '0')}:${String(existing.end_time.getUTCMinutes()).padStart(2, '0')}`
   };
@@ -209,7 +207,7 @@ router.post('/schedules/generate-draft', authorizeRoles('ADMIN', 'MANAGER'), asy
     return res.status(400).json({ error: "Поля 'day_of_week' та 'items' (масив) обов'язкові" });
   }
 
-  const result = await generateDraftSchedule({ day_of_week: String(day_of_week), items });
+  const result = await generateDraftSchedule({ day_of_week: Number(day_of_week), items });
   res.status(200).json(result);
 }));
 
