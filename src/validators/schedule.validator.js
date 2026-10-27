@@ -24,10 +24,11 @@ function validateScheduleCreate(req, res, next) {
   if (!isPositiveInteger(activity_id)) return res.status(400).json({ error: "activity_id має бути додатним цілим числом" });
   if (!isPositiveInteger(teacher_id)) return res.status(400).json({ error: "teacher_id має бути додатним цілим числом" });
   if (!isPositiveInteger(room_id)) return res.status(400).json({ error: "room_id має бути додатним цілим числом" });
-  
-  if (!day_of_week || typeof day_of_week !== 'string') {
-    return res.status(400).json({ error: "Некоректний або відсутній 'day_of_week'" });
+
+  if (!day_of_week || (typeof day_of_week !== 'string' && typeof day_of_week !== 'number')) {
+    return res.status(400).json({ error: "Поле 'day_of_week' є обов'язковим" });
   }
+
   if (!isValidTimeFormat(start_time)) {
     return res.status(400).json({ error: "Некоректний формат 'start_time' (очікується HH:MM)" });
   }
@@ -39,7 +40,7 @@ function validateScheduleCreate(req, res, next) {
 }
 
 function validateScheduleUpdate(req, res, next) {
-  const { group_id, activity_id, teacher_id, room_id, start_time, end_time } = req.body;
+  const { group_id, activity_id, teacher_id, room_id, day_of_week, start_time, end_time } = req.body;
 
   if (group_id !== undefined && !isPositiveInteger(group_id)) return res.status(400).json({ error: "group_id має бути додатним цілим числом" });
   if (activity_id !== undefined && !isPositiveInteger(activity_id)) return res.status(400).json({ error: "activity_id має бути додатним цілим числом" });
@@ -52,6 +53,7 @@ function validateScheduleUpdate(req, res, next) {
   if (end_time && !isValidTimeFormat(end_time)) {
     return res.status(400).json({ error: "Некоректний формат 'end_time' (очікується HH:MM)" });
   }
+
   next();
 }
 
