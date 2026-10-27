@@ -6,7 +6,6 @@ const { validateActivity, validateScheduleCreate, validateScheduleUpdate } = req
 
 const authModule = require('../middleware/authenticate');
 
-
 const authenticate = typeof authModule === 'function' ? authModule : authModule.authenticate;
 const authorizeRoles = authModule.authorizeRoles || function(...allowedRoles) {
   return (req, res, next) => {
@@ -56,9 +55,14 @@ router.get('/schedules', asyncHandler(async (req, res) => {
   const { role, id: userId } = req.user;
 
   if (role === 'Parent') {
+    // Точна відповідність зв'язку M:N через child_parents зі схеми
     const parentRecord = await prisma.parents.findUnique({
       where: { user_id: userId },
-      include: { child_parents: { include: { child: true } } }
+      include: {
+        child_parents: {
+          include: { child: true }
+        }
+      }
     });
 
     if (!parentRecord) return res.status(404).json({ error: 'Профіль батьків не знайдено' });
@@ -69,7 +73,7 @@ router.get('/schedules', asyncHandler(async (req, res) => {
 
     const schedules = await prisma.schedules.findMany({
       where: { group_id: { in: groupIds } },
-      include: { activity: true, room: true, teacher: true }
+      include: { activity: true, room: true, teacher: true, group: true }
     });
     return res.json(schedules);
   }
@@ -119,7 +123,7 @@ router.post('/schedules', authorizeRoles('Admin', 'Manager', 'Teacher'), validat
       activity_id: Number(activity_id),
       teacher_id: Number(teacher_id),
       room_id: Number(room_id),
-      day_of_week: String(day_of_week),
+      day_of_week: String(day_of_week), // Зберігаємо як String відповідно до schema.prisma
       start_time: new Date(`1970-01-01T${start_time}:00Z`),
       end_time: new Date(`1970-01-01T${end_time}:00Z`)
     }
@@ -140,7 +144,6 @@ router.put('/schedules/:id', authorizeRoles('Admin', 'Manager', 'Teacher'), vali
     if (!employee || employee.id !== existing.teacher_id) {
       return res.status(403).json({ error: 'Викладач може редагувати тільки власні заняття' });
     }
-    // Фіксація teacher_id для викладача
     targetTeacherId = employee.id;
   }
 
@@ -201,7 +204,7 @@ router.post('/schedules/generate-draft', authorizeRoles('Admin', 'Manager'), asy
     return res.status(400).json({ error: "Поля 'day_of_week' та 'items' (масив) обов'язкові" });
   }
 
-  const result = await generateDraftSchedule({ day_of_week, items });
+  const result = await generateDraftSchedule({ day_of_week: String(day_of_week), items });
   res.status(200).json(result);
 }));
 
