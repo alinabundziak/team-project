@@ -167,7 +167,13 @@ async function generateDraftSchedule({ day_of_week, items }) {
 
   for (const reqItem of sortedItems) {
     const { group_id, activity_id, teacher_id, room_id, duration } = reqItem;
-    const durationMins = Number(duration) || 45;
+
+    // ВАЛІДАЦІЯ DURATION:
+    const durationMins = Number(duration);
+    if (!Number.isInteger(durationMins) || durationMins <= 0) {
+      errors.push({ item: reqItem, reason: 'Тривалість заняття (duration) має бути додатним цілим числом у хвилинах' });
+      continue;
+    }
 
     const targetAge = groupTargetAges[group_id];
     if (targetAge && ageGroupCounts[targetAge]) {
