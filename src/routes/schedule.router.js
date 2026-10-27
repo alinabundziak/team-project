@@ -2,7 +2,12 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../config/prisma');
 const { checkScheduleConflicts, generateDraftSchedule } = require('../services/schedule.service');
-const { validateActivity, validateScheduleCreate, validateScheduleUpdate } = require('../validators/schedule.validator');
+const {
+  validateActivity,
+  validateScheduleCreate,
+  validateScheduleUpdate,
+  isValidDayOfWeek
+} = require('../validators/schedule.validator');
 
 const authModule = require('../middleware/authenticate');
 
@@ -203,11 +208,24 @@ router.delete('/schedules/:id', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), a
 
 router.post('/schedules/generate-draft', authorizeRoles('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
   const { day_of_week, items } = req.body;
-  if (!day_of_week || !Array.isArray(items)) {
-    return res.status(400).json({ error: "Поля 'day_of_week' та 'items' (масив) обов'язкові" });
+
+  if (!isValidDayOfWeek(day_of_week)) {
+    return res.status(400).json({
+      error: "day_of_week має бути цілим числом від 1 до 7"
+    });
   }
 
-  const result = await generateDraftSchedule({ day_of_week: Number(day_of_week), items });
+  if (!Array.isArray(items)) {
+    return res.status(400).json({
+      error: "Поле 'items' має бути масивом"
+    });
+  }
+
+  const result = await generateDraftSchedule({
+    day_of_week: Number(day_of_week),
+    items
+  });
+
   res.status(200).json(result);
 }));
 
