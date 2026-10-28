@@ -24,7 +24,6 @@ function idParams(...names) {
   return (params) => names.forEach((n) => parseId(params[n], n));
 }
 
-module.exports = { validate, idParams };
 const validateIdParam = (paramName = 'id') => {
   return (req, res, next) => {
     const id = req.params[paramName];
@@ -74,6 +73,8 @@ const validateDateQuery = (req, res, next) => {
 };
 
 module.exports = {
+  validate, 
+  idParams,
   validateIdParam,
   validatePaymentInput,
   validateDateQuery
