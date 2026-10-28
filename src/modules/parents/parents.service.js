@@ -2,12 +2,11 @@ const repo = require('./parents.repository');
 const usersRepo = require('../users/users.repository');
 const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
-const { validateName } = require('../../utils/validators');
+const { validateName, validatePhone } = require('../../utils/validators');
 const { parsePagination } = require('../../utils/pagination');
 const { ROLES } = require('../../config/roles');
 
 const PHONE_SEPARATORS_RE = /[\s\-().]/g;
-const PHONE_RE = /^\+?\d{10,15}$/;
 const MAX_SEARCH_LENGTH = 100;
 
 function toParentDto(p) {
@@ -19,17 +18,6 @@ function toParentDto(p) {
     lastName: p.last_name,
     phone: p.phone,
   };
-}
-
-function validatePhone(value) {
-  if (typeof value !== 'string') {
-    throw new AppError(400, "Телефон є обов'язковим");
-  }
-  const cleaned = value.replace(PHONE_SEPARATORS_RE, '');
-  if (!PHONE_RE.test(cleaned)) {
-    throw new AppError(400, 'Некоректний телефон (приклад: +380501234567)');
-  }
-  return cleaned;
 }
 
 function validateUserId(value) {
@@ -75,7 +63,6 @@ async function getParent(rawId) {
 }
 
 async function createParent(input) {
-  // 1) спочатку вся валідація формату (400), потім звернення до БД
   const userId = validateUserId(input.userId);
   const data = {
     user_id: userId,
@@ -84,7 +71,6 @@ async function createParent(input) {
     phone: validatePhone(input.phone),
   };
 
-  // 2) бізнес-правила
   const user = await usersRepo.findById(userId);
   if (!user) throw new AppError(404, 'Користувача не знайдено');
 

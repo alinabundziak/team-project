@@ -1,8 +1,8 @@
 const authService = require('./auth.service');
+const { sendOk } = require('../../utils/respond');
 
 async function login(req, res) {
-  const result = await authService.login(req.body || {});
-  res.status(200).json(result);
+  sendOk(res, await authService.login(req.body));
 }
 
 module.exports = { login };
