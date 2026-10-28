@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
 function findMany({ where, skip, take }) {
-  return prisma.children.findMany({
+  return prisma.child.findMany({
     where,
     skip,
     take,
@@ -10,39 +10,39 @@ function findMany({ where, skip, take }) {
 }
 
 function count(where) {
-  return prisma.children.count({ where });
+  return prisma.child.count({ where });
 }
 
 function findById(id) {
-  return prisma.children.findUnique({ where: { id } });
+  return prisma.child.findUnique({ where: { id: Number(id) } });
 }
 
 function create(data) {
-  return prisma.children.create({ data });
+  return prisma.child.create({ data });
 }
 
 function update(id, data) {
-  return prisma.children.update({ where: { id }, data });
+  return prisma.child.update({ where: { id: Number(id) }, data });
 }
 
 function remove(id) {
-  return prisma.children.delete({ where: { id } });
+  return prisma.child.delete({ where: { id: Number(id) } });
 }
 
 function findGroupById(id) {
-  return prisma.groups.findUnique({ where: { id } });
+  return prisma.group.findUnique({ where: { id: Number(id) } });
 }
 
 function countSubscriptions(childId) {
-  return prisma.subscriptions.count({ where: { child_id: childId } });
+  return prisma.subscription.count({ where: { child_id: Number(childId) } });
 }
 
 function findParentByUserId(userId) {
-  return prisma.parents.findUnique({ where: { user_id: userId } });
+  return prisma.parent.findUnique({ where: { user_id: Number(userId) } });
 }
 
 function countCharges(childId) {
-  return prisma.charges.count({ where: { child_id: childId } });
+  return prisma.charge.count({ where: { child_id: Number(childId) } });
 }
 
 module.exports = {

@@ -202,7 +202,7 @@ const deleteCostRule = async (req, res) => {
 
 async function tuitionEstimate(req, res) {
     try {
-        const result = await service.estimateTuition(req.params.childId, req.query);
+        const result = await service.estimateTuition(req.params.childId, req.query, req.user);
         return res.status(200).json(result);
     } catch (e) {
         return handleError(res, e, 'Error estimating tuition');
@@ -211,7 +211,7 @@ async function tuitionEstimate(req, res) {
 
 async function mealEstimate(req, res) {
     try {
-        const result = await service.estimateMeals(req.params.childId, req.query);
+        const result = await service.estimateMeals(req.params.childId, req.query, req.user);
         return res.status(200).json(result);
     } catch (e) {
         return handleError(res, e, 'Error estimating meals');
