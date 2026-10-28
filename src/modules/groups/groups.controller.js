@@ -111,14 +111,14 @@ function validateGroupData(body, partial = false) {
     }
 
     if (!partial || has("roomId")) {
-    if (!Number.isInteger(body.roomId) || body.roomId <= 0) {
-        return {
-            error: "ID базової кімнати повинен бути додатним цілим числом"
-        };
-    }
+        if (!Number.isInteger(body.roomId) || body.roomId <= 0) {
+            return {
+                error: "ID базової кімнати повинен бути додатним цілим числом"
+            };
+        }
 
-    data.roomId = body.roomId;
-}
+        data.roomId = body.roomId;
+    }
 
     if (partial && Object.keys(data).length === 0) {
         return {
@@ -134,8 +134,10 @@ async function getGroupsOccupancy(req, res) {
         const occupancy = await service.getGroupsOccupancy();
 
         return res.status(200).json({
-            count: occupancy.length,
-            groups: occupancy
+            data: {
+                count: occupancy.length,
+                groups: occupancy
+            }
         });
     } catch (error) {
         return handleGroupError(error, res);
@@ -146,7 +148,7 @@ async function getGroups(req, res) {
     try {
         const groups = await service.getGroups();
 
-        return res.status(200).json(groups);
+        return res.status(200).json({ data: groups });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -156,15 +158,13 @@ async function createGroup(req, res) {
     const result = validateGroupData(req.body);
 
     if (result.error) {
-        return res.status(400).json({
-            error: result.error
-        });
+        return sendGroupError(res, 400, result.error);
     }
 
     try {
         const group = await service.createGroup(result.data);
 
-        return res.status(201).json(group);
+        return res.status(201).json({ data: group });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -184,7 +184,7 @@ async function getGroupById(req, res) {
     try {
         const group = await service.getGroupById(id);
 
-        return res.status(200).json(group);
+        return res.status(200).json({ data: group });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -204,15 +204,13 @@ async function updateGroup(req, res) {
     const result = validateGroupData(req.body, true);
 
     if (result.error) {
-        return res.status(400).json({
-            error: result.error
-        });
+        return sendGroupError(res, 400, result.error);
     }
 
     try {
         const group = await service.updateGroup(id, result.data);
 
-        return res.status(200).json(group);
+        return res.status(200).json({ data: group });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -233,7 +231,9 @@ async function deleteGroup(req, res) {
         await service.deleteGroup(id);
 
         return res.status(200).json({
-            message: "Групу успішно видалено"
+            data: {
+                message: "Групу успішно видалено"
+            }
         });
     } catch (error) {
         return handleGroupError(error, res);
@@ -244,15 +244,13 @@ async function getGroupChildren(req, res) {
     const groupId = parseId(req.params.id);
 
     if (groupId === null) {
-        return res.status(400).json({
-            error: "Некоректний ID групи"
-        });
+        return sendGroupError(res, 400, "Некоректний ID групи");
     }
 
     try {
         const children = await service.getGroupChildren(groupId);
 
-        return res.status(200).json(children);
+        return res.status(200).json({ data: children });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -263,21 +261,17 @@ async function addChildToGroup(req, res) {
     const childId = req.body?.childId;
 
     if (groupId === null) {
-        return res.status(400).json({
-            error: "Некоректний ID групи"
-        });
+        return sendGroupError(res, 400, "Некоректний ID групи");
     }
 
     if (!Number.isInteger(childId) || childId <= 0) {
-        return res.status(400).json({
-            error: "childId повинен бути додатним цілим числом"
-        });
+        return sendGroupError(res, 400, "childId повинен бути додатним цілим числом");
     }
 
     try {
         const child = await service.addChildToGroup(groupId, childId);
 
-        return res.status(200).json(child);
+        return res.status(201).json({ data: child });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -287,17 +281,21 @@ async function removeChildFromGroup(req, res) {
     const groupId = parseId(req.params.id);
     const childId = parseId(req.params.childId);
 
-    if (groupId === null || childId === null) {
-        return res.status(400).json({
-            error: "ID групи та дитини повинні бути додатними цілими числами"
-        });
+    if (groupId === null) {
+        return sendGroupError(res, 400, "Некоректний ID групи");
+    }
+
+    if (childId === null) {
+        return sendGroupError(res, 400, "Некоректний ID дитини");
     }
 
     try {
         await service.removeChildFromGroup(groupId, childId);
 
         return res.status(200).json({
-            message: "Дитину виключено з групи"
+            data: {
+                message: "Дитину виключено з групи"
+            },
         });
     } catch (error) {
         return handleGroupError(error, res);
@@ -309,15 +307,11 @@ async function assignStaffToGroup(req, res) {
     const staffId = req.body?.staffId;
 
     if (groupId === null) {
-        return res.status(400).json({
-            error: "Некоректний ID групи"
-        });
+        return sendGroupError(res, 400, "Некоректний ID групи");
     }
 
     if (!Number.isInteger(staffId) || staffId <= 0) {
-        return res.status(400).json({
-            error: "staffId повинен бути додатним цілим числом"
-        });
+        return sendGroupError(res, 400, "staffId повинен бути додатним цілим числом");
     }
 
     try {
@@ -326,7 +320,7 @@ async function assignStaffToGroup(req, res) {
             staffId
         );
 
-        return res.status(201).json(assignment);
+        return res.status(201).json({ data: assignment });
     } catch (error) {
         return handleGroupError(error, res);
     }
@@ -336,17 +330,21 @@ async function removeStaffFromGroup(req, res) {
     const groupId = parseId(req.params.id);
     const staffId = parseId(req.params.staffId);
 
-    if (groupId === null || staffId === null) {
-        return res.status(400).json({
-            error: "Некоректний ID групи або працівника"
-        });
+    if (groupId === null) {
+        return sendGroupError(res, 400, "Некоректний ID групи");
+    }
+
+    if (staffId === null) {
+        return sendGroupError(res, 400, "Некоректний ID працівника");
     }
 
     try {
         await service.removeStaffFromGroup(groupId, staffId);
 
         return res.status(200).json({
-            message: "Призначення працівника скасовано"
+            data: {
+                message: "Призначення працівника скасовано"
+            }
         });
     } catch (error) {
         return handleGroupError(error, res);

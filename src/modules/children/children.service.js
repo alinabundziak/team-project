@@ -6,6 +6,7 @@ const rules = require('../../config/childrenRules');
 const { validateName } = require('../../utils/validators');
 const { parsePagination } = require('../../utils/pagination');
 const { assertChildAccess, getOwnParentId } = require('./children.access');
+const { assertGroupHasCapacity } = require('../groups/groupCapacity.service');
 
 // Єдиний формат дитини назовні (контракт для Dev 2 і Dev 4)
 function toChildDto(child) {
@@ -49,6 +50,20 @@ async function resolveGroupId(value) {
     throw new AppError(404, 'Групу не знайдено');
   }
   return value;
+}
+
+async function assertChildAgeMatchesGroup(groupId, birthDate) {
+  const group = await repo.findGroupById(groupId);
+
+  if (!group) {
+    throw new AppError(404, 'Групу не знайдено');
+  }
+
+  const childAge = calculateAge(birthDate);
+
+  if (childAge !== group.target_age) {
+    throw new AppError(409, 'Вік дитини не відповідає віку групи');
+  }
 }
 
 async function listChildren(query = {}) {
@@ -110,6 +125,11 @@ async function createChild(input) {
     group_id: input.groupId === undefined ? null : await resolveGroupId(input.groupId),
   };
 
+  if (data.group_id !== null) {
+    await assertChildAgeMatchesGroup(data.group_id, data.birth_date);
+    await assertGroupHasCapacity(data.group_id);
+  }
+
   const child = await repo.create(data);
   return toChildDto(child);
 }
@@ -129,6 +149,31 @@ async function updateChild(rawId, input) {
 
   const existing = await repo.findById(id);
   if (!existing) throw new AppError(404, 'Дитину не знайдено');
+
+  const effectiveGroupId =
+    data.group_id !== undefined ? data.group_id : existing.group_id;
+
+  const effectiveBirthDate =
+    data.birth_date !== undefined ? data.birth_date : existing.birth_date;
+
+  if (
+    effectiveGroupId !== null &&
+    effectiveGroupId !== undefined &&
+    (data.group_id !== undefined || data.birth_date !== undefined)
+  ) {
+    await assertChildAgeMatchesGroup(
+      effectiveGroupId,
+      effectiveBirthDate
+    );
+  }
+
+  if (
+    data.group_id !== undefined &&
+    data.group_id !== null &&
+    data.group_id !== existing.group_id
+  ) {
+    await assertGroupHasCapacity(data.group_id, id);
+  }
 
   try {
     const child = await repo.update(id, data);

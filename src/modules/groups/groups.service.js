@@ -27,14 +27,20 @@ function createServiceError(message, code, status) {
 }
 
 function formatGroup(group) {
+    const assignments = group.staff_assignments || [];
+
     return {
         id: group.id,
         name: group.name,
         ageYears: group.target_age,
         capacity: group.capacity,
         roomId: group.room_id,
-        educatorId: group.educator_id,
-        assistantId: group.assistant_id,
+        educatorId:
+            assignments.find(assignment => assignment.role === "EDUCATOR")
+                ?.employee_id ?? null,
+        assistantId:
+            assignments.find(assignment => assignment.role === "ASSISTANT")
+                ?.employee_id ?? null,
         room: group.room,
         childrenCount: group._count.children,
         staffAssignmentsCount: group._count.staff_assignments,
@@ -149,7 +155,7 @@ async function getGroupsOccupancy() {
     return groups.map(group => {
         const childrenCount = group._count.children;
         const groupCapacity = group.capacity;
-        const roomCapacity = group.room.capacity;
+        const roomCapacity = group.room?.capacity ?? groupCapacity;
 
         return {
             groupId: group.id,
@@ -157,18 +163,20 @@ async function getGroupsOccupancy() {
             ageYears: group.target_age,
             childrenCount,
             groupCapacity,
-            room: {
-                id: group.room.id,
-                name: group.room.name,
-                capacity: roomCapacity
-            },
+            room: group.room
+                ? {
+                    id: group.room.id,
+                    name: group.room.name,
+                    capacity: group.room.capacity
+                }
+                : null,
             occupancyPercent: groupCapacity > 0
-                ? Math.round(
-                    childrenCount / groupCapacity * 10000
-                ) / 100
+                ? Math.round(childrenCount / groupCapacity * 10000) / 100
                 : null,
             exceedsGroupCapacity: childrenCount > groupCapacity,
-            exceedsRoomCapacity: childrenCount > roomCapacity,
+            exceedsRoomCapacity:
+                group.room?.capacity != null &&
+                childrenCount > group.room.capacity,
             isOverCapacity:
                 childrenCount > groupCapacity ||
                 childrenCount > roomCapacity
@@ -396,7 +404,12 @@ async function addChildToGroup(groupId, childId) {
         select: {
             id: true,
             target_age: true,
-            capacity: true
+            capacity: true,
+            room: {
+                select: {
+                    capacity: true
+                }
+            }
         }
     });
 
@@ -405,6 +418,14 @@ async function addChildToGroup(groupId, childId) {
             "Групу не знайдено",
             "GROUP_NOT_FOUND",
             404
+        );
+    }
+
+    if (!group.room) {
+        throw createServiceError(
+            "Для групи не призначено базове приміщення",
+            "GROUP_ROOM_REQUIRED",
+            409
         );
     }
 
@@ -457,12 +478,18 @@ async function addChildToGroup(groupId, childId) {
         where: { group_id: groupId }
     });
 
-    if (childrenCount >= group.capacity) {
-        throw createServiceError(
-            "У групі немає вільних місць",
-            "GROUP_FULL",
-            409
-        );
+    const maxCapacity = Math.min(
+        group.capacity ?? 20,
+        group.room.capacity ?? group.capacity ?? 20,
+        20
+    );
+
+    if (childrenCount >= maxCapacity) {
+            throw createServiceError(
+                "У групі немає вільних місць",
+                "GROUP_FULL",
+                409
+            );
     }
 
     const updatedChild = await prisma.children.update({
@@ -532,7 +559,10 @@ async function assignStaffToGroup(groupId, staffId) {
         }),
         prisma.employees.findUnique({
             where: { id: staffId },
-            select: { id: true }
+            select: {
+                id: true,
+                position: true
+            }
         })
     ]);
 
@@ -549,6 +579,41 @@ async function assignStaffToGroup(groupId, staffId) {
             "Працівника не знайдено",
             "STAFF_NOT_FOUND",
             404
+        );
+    }
+
+    if (!["EDUCATOR", "ASSISTANT"].includes(staff.position)) {
+        throw createServiceError(
+            "До групи можна призначити лише вихователя або помічника",
+            "STAFF_POSITION_NOT_ALLOWED",
+            409
+        );
+    }
+
+    const assignedToAnotherGroup = await prisma.groups.findFirst({
+        where: {
+            id: { not: groupId },
+            OR: [
+                {
+                    staff_assignments: {
+                        some: { employee_id: staffId }
+                    }
+                },
+                {
+                    schedules: {
+                        some: { teacher_id: staffId }
+                    }
+                }
+            ]
+        },
+        select: { id: true }
+    });
+
+    if (assignedToAnotherGroup) {
+        throw createServiceError(
+            "Працівник уже пов'язаний з іншою групою",
+            "STAFF_ASSIGNED_TO_ANOTHER_GROUP",
+            409
         );
     }
 
@@ -573,19 +638,22 @@ async function assignStaffToGroup(groupId, staffId) {
     const assignment = await prisma.staff_assignments.create({
         data: {
             employee_id: staffId,
-            group_id: groupId
+            group_id: groupId,
+            role: staff.position
         },
         select: {
             employee_id: true,
             group_id: true,
-            assigned_at: true
+            role: true,
+            created_at: true
         }
     });
 
     return {
         staffId: assignment.employee_id,
         groupId: assignment.group_id,
-        assignedAt: assignment.assigned_at
+        role: assignment.role,
+        assignedAt: assignment.created_at
     };
 }
 
