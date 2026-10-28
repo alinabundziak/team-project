@@ -239,7 +239,13 @@ class PricingService {
 
             return await prisma.payments.findMany({
                 where: {
-                    children: { parent_id: parent.id }
+                    children: {
+                        child_parents: {
+                            some: {
+                                parent_id: parent.id
+                            }
+                        }
+                    }
                 },
                 include: { children: true }
             });
