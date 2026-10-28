@@ -31,6 +31,10 @@ model users {
   employees     employees?
   parents       parents?
   roles         roles?        @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  first_name String? @db.VarChar(100)
+  last_name String? @db.VarChar(100)
+  phone String? @db.VarChar(50)
+  is_active Boolean? @default(true)
 }
 
 model employees {
@@ -58,6 +62,7 @@ model parents {
   phone      String?    @db.VarChar(20)
   children   children[]
   users      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  child_parents child_parents[]
 }
 
 model rooms {
@@ -83,6 +88,7 @@ model groups {
   employees_educator  employees?          @relation("groups_educator_idToemployees", fields: [educator_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   schedules           schedules[]
   staff_assignments   staff_assignments[]
+  created_at DateTime? @db.Timestamptz
 }
 
 model children {
@@ -100,6 +106,8 @@ model children {
   payments       payments[]
   subscriptions  subscriptions[]
   child_benefits child_benefits[]
+  parent_note String? @db.VarChar(500)
+  child_parents child_parents[]
 }
 
 model discounts {
@@ -141,6 +149,7 @@ model schedules {
   groups      groups?     @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   rooms       rooms?      @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   employees   employees?  @relation(fields: [teacher_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  created_at DateTime? @db.Timestamptz
 }
 
 model staff_assignments {
@@ -151,6 +160,7 @@ model staff_assignments {
   group       groups    @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@id([employee_id, group_id])
+  role String? @db.VarChar(50)
 }
 
 model rules {
@@ -285,4 +295,18 @@ model expenses {
   category    String   @db.VarChar(50)
   date        DateTime @default(now())
   isEstimated Boolean  @default(false)
+  description String? @db.Text
+  created_at DateTime? @db.Timestamptz
+}
+
+// Additional many-to-many parent links; existing children.parent_id remains intact.
+model child_parents {
+  child_id   Int
+  parent_id  Int
+  created_at DateTime? @default(now())
+
+  child      children  @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  parent     parents   @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+
+  @@id([child_id, parent_id])
 }
