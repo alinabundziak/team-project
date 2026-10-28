@@ -31,6 +31,10 @@ model users {
   employees     employees?
   parents       parents?
   roles         roles?        @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  first_name String? @db.VarChar(100)
+  last_name String? @db.VarChar(100)
+  phone String? @db.VarChar(50)
+  is_active Boolean? @default(true)
 }
 
 model employees {
@@ -38,13 +42,12 @@ model employees {
   user_id            Int?                 @unique
   first_name         String               @db.VarChar(100)
   last_name          String               @db.VarChar(100)
-  phone              String?              @db.VarChar(20)
+  phone              String?              @db.VarChar(50)
   position           String               @db.VarChar(100)
   subject            String?              @db.VarChar(100)
   salary             Decimal              @default(40000.00) @db.Decimal(10, 2)
   users              users?               @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups_assistant   groups[]             @relation("groups_assistant_idToemployees")
-  groups_educator    groups[]             @relation("groups_educator_idToemployees")
+
   schedules          schedules[]
   staff_assignments  staff_assignments[]
   teacher_activities teacher_activities[]
@@ -56,8 +59,8 @@ model parents {
   first_name String     @db.VarChar(100)
   last_name  String     @db.VarChar(100)
   phone      String?    @db.VarChar(20)
-  children   children[]
   users      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  child_parents child_parents[]
 }
 
 model rooms {
@@ -70,19 +73,18 @@ model rooms {
 }
 
 model groups {
-  id                  Int                 @id @default(autoincrement())
-  name                String              @db.VarChar(100)
-  target_age          Int
-  capacity            Int?                @default(20)
-  room_id             Int?                @unique
-  educator_id         Int?
-  assistant_id        Int?
-  children            children[]
-  room                rooms?              @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees_assistant employees?          @relation("groups_assistant_idToemployees", fields: [assistant_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees_educator  employees?          @relation("groups_educator_idToemployees", fields: [educator_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  schedules           schedules[]
-  staff_assignments   staff_assignments[]
+  id                Int                 @id @default(autoincrement())
+  name              String              @db.VarChar(100)
+  target_age        Int
+  
+  capacity          Int                 @default(20)
+  room_id           Int?                @unique
+ 
+  children          children[]
+  room              rooms?              @relation(fields: [room_id], references: [id], onDelete: SetNull)
+  schedules         schedules[]
+  staff_assignments staff_assignments[]
+  created_at        DateTime?           @db.Timestamptz
 }
 
 model children {
@@ -91,15 +93,15 @@ model children {
   last_name      String           @db.VarChar(100)
   birth_date     DateTime         @db.Date
   group_id       Int?
-  parent_id      Int?
   discount_id    Int?             @default(1)
   discounts      discounts?       @relation(fields: [discount_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   groups         groups?          @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  parents        parents?         @relation(fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   charges        charges[]
   payments       payments[]
   subscriptions  subscriptions[]
   child_benefits child_benefits[]
+  parent_note String? @db.VarChar(500)
+  child_parents child_parents[]
 }
 
 model discounts {
@@ -141,16 +143,21 @@ model schedules {
   groups      groups?     @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   rooms       rooms?      @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   employees   employees?  @relation(fields: [teacher_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  created_at DateTime? @db.Timestamptz
 }
 
 model staff_assignments {
+  
+  id          Int        @id @default(autoincrement())
   employee_id Int
   group_id    Int
-  assigned_at DateTime  @default(now()) @db.Timestamp(6)
-  employee    employees @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  group       groups    @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  role        String?    @db.VarChar(50)
+  created_at  DateTime?  @db.Timestamptz
 
-  @@id([employee_id, group_id])
+  employee    employees  @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  group       groups     @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([employee_id, group_id])
 }
 
 model rules {
@@ -285,4 +292,18 @@ model expenses {
   category    String   @db.VarChar(50)
   date        DateTime @default(now())
   isEstimated Boolean  @default(false)
+  description String? @db.Text
+  created_at DateTime? @db.Timestamptz
+}
+
+
+model child_parents {
+  child_id   Int
+  parent_id  Int
+  created_at DateTime? @default(now())
+
+  child      children  @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  parent     parents   @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+
+  @@id([child_id, parent_id])
 }
