@@ -94,7 +94,7 @@ async function createStaff(data, includeSalary = false) {
 async function updateStaff(id, data, includeSalary = false) {
     const existingStaff = await prisma.employees.findUnique({
         where: { id },
-        select: { id: true }
+        select: { id: true, position: true}
     });
 
     if (!existingStaff) {
@@ -104,6 +104,84 @@ async function updateStaff(id, data, includeSalary = false) {
             404
         );
     }
+
+    if (
+        data.position !== undefined &&
+        data.position !== existingStaff.position
+    ) {
+        const [
+            groupsCount,
+            schedulesCount,
+            activitiesCount,
+            assignmentsCount
+        ] = await Promise.all([
+            prisma.groups.count({
+                where: {
+                    OR: [
+                        { educator_id: id },
+                        { assistant_id: id }
+                    ]
+                }
+            }),
+            prisma.schedules.count({
+                where: { teacher_id: id }
+            }),
+            prisma.teacher_activities.count({
+                where: { employee_id: id }
+            }),
+            prisma.staff_assignments.count({
+                where: { employee_id: id }
+            })
+        ]);
+
+        if (
+            groupsCount > 0 ||
+            schedulesCount > 0 ||
+            activitiesCount > 0 ||
+            assignmentsCount > 0
+        ) {
+            throw createStaffError(
+                "Не можна змінити посаду працівника, поки він має пов'язані призначення",
+                "STAFF_POSITION_IN_USE",
+                409
+            );
+        }
+    }
+
+        if (
+            data.subject !== undefined &&
+            existingStaff.position === "TEACHER"
+        ) {
+            const activityAssignments =
+                await prisma.teacher_activities.findMany({
+                    where: { employee_id: id },
+                    select: {
+                        activities: {
+                            select: { name: true }
+                        }
+                    }
+                });
+
+            const newSubject =
+                typeof data.subject === "string"
+                    ? data.subject.trim().toLocaleLowerCase("uk-UA")
+                    : "";
+
+            const hasMismatchedActivity = activityAssignments.some(
+                ({ activities }) =>
+                    !newSubject ||
+                    newSubject !==
+                        activities.name.trim().toLocaleLowerCase("uk-UA")
+            );
+
+            if (hasMismatchedActivity) {
+                throw createStaffError(
+                    "Не можна змінити предмет викладача, поки він призначений до іншої дисципліни",
+                    "STAFF_SUBJECT_IN_USE",
+                    409
+                );
+            }
+        }
 
     const updateData = {};
 
@@ -276,14 +354,14 @@ async function getSalaryEstimates() {
         };
     });
 
-    const monthlyRent = groups.length * 50000;
+    const monthlyRent = groups.length * (payrollEstimate.rentPerGroup ?? 50000);
 
     return {
         currency: "UAH",
         groups: groupEstimates,
         staffCosts: {
             teachersCount: payrollEstimate.teachersCount,
-            monthlySalaryPerTeacher: 40000,
+            monthlySalaryPerTeacher: payrollEstimate.monthlySalaryPerTeacher ?? 40000,
             teachersMonthlySalary: payrollEstimate.teachersMonthlySalary,
             managerCount: 1,
             managerMonthlySalary: payrollEstimate.managerMonthlySalary
@@ -291,7 +369,7 @@ async function getSalaryEstimates() {
         totalMonthlyPersonnelExpenses: payrollEstimate.totalMonthlySalary,
         rent: {
             roomCount: groups.length,
-            monthlyCostPerRoom: 50000,
+            monthlyCostPerRoom: payrollEstimate.rentPerGroup ?? 50000,
             totalMonthlyRent: monthlyRent
         },
         totalMonthlyExpenses:

@@ -1,5 +1,6 @@
 
 const prisma = require("../../config/prisma");
+const MAX_CHILDREN_PER_GROUP = 20;
 
 function createOptimizationError(message, status = 500) {
     const error = new Error(message);
@@ -28,8 +29,98 @@ function calculateAge(birthDate) {
     return age;
 }
 
+function getGroupCountRecommendations(groups, children) {
+    const childrenByAge = new Map();
+
+    for (const child of children) {
+        if (!child.birth_date) {
+            continue;
+        }
+
+        const birthDate = new Date(child.birth_date);
+
+        if (Number.isNaN(birthDate.getTime())) {
+            continue;
+        }
+
+        const age = calculateAge(birthDate);
+
+        if (age < 0) {
+            continue;
+        }
+
+        childrenByAge.set(
+            age,
+            (childrenByAge.get(age) || 0) + 1
+        );
+    }
+
+    const capacityByAge = new Map();
+
+    for (const group of groups) {
+        const groupCapacity = group.capacity ?? MAX_CHILDREN_PER_GROUP;
+        const roomCapacity =
+            group.room?.capacity ?? MAX_CHILDREN_PER_GROUP;
+        const effectiveCapacity = Math.min(
+            groupCapacity,
+            roomCapacity,
+            MAX_CHILDREN_PER_GROUP
+        );
+
+        const current = capacityByAge.get(group.target_age) || {
+            groupCount: 0,
+            totalCapacity: 0
+        };
+
+        current.groupCount += 1;
+        current.totalCapacity += effectiveCapacity;
+        capacityByAge.set(group.target_age, current);
+    }
+
+    const recommendations = [];
+
+    for (const [age, childrenCount] of childrenByAge) {
+        const current = capacityByAge.get(age) || {
+            groupCount: 0,
+            totalCapacity: 0
+        };
+
+        const capacityShortage =
+            childrenCount - current.totalCapacity;
+
+        if (capacityShortage <= 0) {
+            continue;
+        }
+
+        const additionalGroupsCount = Math.ceil(
+            capacityShortage / MAX_CHILDREN_PER_GROUP
+        );
+
+        recommendations.push({
+            type: "GROUP_COUNT",
+            priority: "HIGH",
+            ageYears: age,
+            childrenCount,
+            currentGroupCount: current.groupCount,
+            currentCapacity: current.totalCapacity,
+            additionalGroupsCount,
+            recommendedGroupCount:
+                current.groupCount + additionalGroupsCount,
+            reason:
+                `Для дітей віком ${age} років бракує місць ` +
+                `у групах. Потрібно додати ${additionalGroupsCount} груп.`,
+            expectedResult:
+                "Після створення рекомендованих груп усі діти матимуть місця " +
+                "у групах відповідного віку в межах місткості.",
+            applied: false
+        });
+    }
+
+    return recommendations;
+}
+
 async function getOptimizationRecommendations() {
-    const [groups, employees] = await Promise.all([
+    const [groups, employees, children] = await Promise.all([
         prisma.groups.findMany({
             include: {
                 room: {
@@ -99,17 +190,28 @@ async function getOptimizationRecommendations() {
                 position: true
             },
             orderBy: { id: "asc" }
+        }),
+
+        prisma.children.findMany({
+            select: {
+                id: true,
+                birth_date: true,
+                group_id: true
+            },
+            orderBy: { id: "asc" }
         })
     ]);
 
     const recommendations = [];
+    recommendations.push(...getGroupCountRecommendations(groups, children));
 
     for (const sourceGroup of groups) {
-        const sourceRoomCapacity =
-            sourceGroup.room?.capacity ?? sourceGroup.capacity;
+        const sourceGroupCapacity = sourceGroup.capacity ?? MAX_CHILDREN_PER_GROUP;
+        const sourceRoomCapacity = sourceGroup.room?.capacity ?? sourceGroupCapacity;
         const sourceEffectiveCapacity = Math.min(
-            sourceGroup.capacity,
-            sourceRoomCapacity
+            sourceGroupCapacity,
+            sourceRoomCapacity,
+            MAX_CHILDREN_PER_GROUP
         );
         const excessChildren = sourceGroup.children.length - sourceEffectiveCapacity;
 
@@ -133,11 +235,14 @@ async function getOptimizationRecommendations() {
                 continue;
             }
 
+            const targetGroupCapacity =
+                targetGroup.capacity ?? MAX_CHILDREN_PER_GROUP;
             const targetRoomCapacity =
-                targetGroup.room?.capacity ?? targetGroup.capacity;
+                targetGroup.room?.capacity ?? targetGroupCapacity;
             const targetEffectiveCapacity = Math.min(
-                targetGroup.capacity,
-                targetRoomCapacity
+                targetGroupCapacity,
+                targetRoomCapacity,
+                MAX_CHILDREN_PER_GROUP
             );
             const freePlaces =
                 targetEffectiveCapacity - targetGroup.children.length;

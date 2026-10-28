@@ -6,7 +6,7 @@ async function getRecommendations(req, res) {
         const recommendations =
             await service.getOptimizationRecommendations();
 
-        return res.status(200).json(recommendations);
+        return res.status(200).json({ data: recommendations });
     } catch (error) {
         console.error("Помилка формування рекомендацій:", error);
 
