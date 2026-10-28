@@ -45,7 +45,7 @@ class AnalyticsService {
 
       let chargesTotal = new Decimal(0);
       try {
-        const res = await prisma.charge.aggregate({
+        const res = await prisma.charges.aggregate({
           _sum: { total_amount: true },
           where: dateFilter,
         });
@@ -82,7 +82,7 @@ class AnalyticsService {
 
       let groups = [];
       try {
-        groups = await prisma.group.findMany({
+        groups = await prisma.groups.findMany({
           include: {
             children: {
               include: {
@@ -171,7 +171,7 @@ class AnalyticsService {
 
       let teachersCount = 0;
       try {
-        teachersCount = await prisma.employee.count({ where: { position: 'TEACHER' } });
+        teachersCount = await prisma.employees.count({ where: { position: 'TEACHER' } });
       } catch (e) {
         console.error('[AnalyticsService] Error counting teachers:', e.message);
       }
@@ -356,7 +356,7 @@ class AnalyticsService {
     const rawGroups = parseInt(scenarioParams.targetGroupsCount, 10);
     let dbGroupsCount = 1;
     try {
-      dbGroupsCount = await prisma.group.count() || 1;
+      dbGroupsCount = await prisma.groups.count() || 1;
     } catch (e) {
       console.error('[AnalyticsService] Error counting groups:', e.message);
     }
@@ -458,7 +458,7 @@ class AnalyticsService {
   async getStaffOptimizationRecommendations() {
     let groups = [];
     try {
-      groups = await prisma.group.findMany({
+      groups = await prisma.groups.findMany({
         include: { children: true },
       });
     } catch (e) {

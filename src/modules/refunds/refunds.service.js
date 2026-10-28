@@ -14,7 +14,7 @@ function toRefundDto(r, childId) {
     id: r.id,
     childId,
     paymentId: r.payment_id,
-    amount: r.amount.toFixed(2),
+    amount: typeof r.amount === 'object' && r.amount.toFixed ? r.amount.toFixed(2) : String(r.amount),
     reason: r.reason,
     createdAt: r.created_at,
   };

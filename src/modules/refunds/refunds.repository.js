@@ -1,11 +1,12 @@
 const prisma = require('../../config/prisma');
+const { Prisma } = require('@prisma/client');
 
 function create(data, tx = prisma) {
-  return tx.refund.create({ data });
+  return tx.refunds.create({ data });
 }
 
 async function sumByPayment(paymentId, tx = prisma) {
-  const res = await tx.refund.aggregate({
+  const res = await tx.refunds.aggregate({
     where: { payment_id: paymentId },
     _sum: { amount: true },
   });
@@ -13,7 +14,7 @@ async function sumByPayment(paymentId, tx = prisma) {
 }
 
 async function sumByChild(childId, tx = prisma) {
-  const res = await tx.refund.aggregate({
+  const res = await tx.refunds.aggregate({
     where: { payment: { child_id: childId } },
     _sum: { amount: true },
   });
@@ -21,25 +22,32 @@ async function sumByChild(childId, tx = prisma) {
 }
 
 function findManyByChild(childId, tx = prisma) {
-  return tx.refund.findMany({ where: { payment: { child_id: childId } } });
+  return tx.refunds.findMany({ where: { payment: { child_id: childId } } });
 }
 
 async function createWithLimitCheck(paymentId, amountDecimal, maxAllowedDecimal, data) {
-  return await prisma.$transaction(async (tx) => {
-    const res = await tx.refund.aggregate({
-      where: { payment_id: paymentId },
-      _sum: { amount: true },
-    });
-    const alreadyRefunded = new (require('@prisma/client').Prisma.Decimal)(res._sum.amount ?? 0);
-    const available = maxAllowedDecimal.minus(alreadyRefunded);
+  return await prisma.$transaction(
+    async (tx) => {
+      const res = await tx.refunds.aggregate({
+        where: { payment_id: paymentId },
+        _sum: { amount: true },
+      });
+      const alreadyRefunded = new Prisma.Decimal(res._sum.amount ?? 0);
+      const available = maxAllowedDecimal.minus(alreadyRefunded);
 
-    if (amountDecimal.gt(available)) {
-      const AppError = require('../../utils/AppError');
-      throw new AppError(409, `Сума повернення перевищує доступну по цій оплаті (${available.toFixed(2)})`);
+      if (amountDecimal.gt(available)) {
+        const AppError = require('../../utils/AppError');
+        throw new AppError(409, `Сума повернення перевищує доступну по цій оплаті (${available.toFixed(2)})`);
+      }
+
+      return await tx.refunds.create({ data });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 10000,
     }
-
-    return await tx.refund.create({ data });
-  });
+  );
 }
 
 module.exports = { create, sumByPayment, sumByChild, findManyByChild, createWithLimitCheck };
