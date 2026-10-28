@@ -16,7 +16,7 @@ function calculateAgeInYears(birthDate) {
 class AnalyticsService {
   async getMealRateByAge(age) {
     try {
-      const rate = await prisma.mealRate.findFirst({
+      const rate = await prisma.meal_rates.findFirst({
         where: { age: { lte: age } },
         orderBy: [{ age: 'desc' }, { valid_from: 'desc' }],
       });
@@ -56,18 +56,18 @@ class AnalyticsService {
 
       let paymentsTotal = new Decimal(0);
       try {
-        const res = await prisma.payment.aggregate({
-          _sum: { amount: true },
+        const res = await prisma.payments.aggregate({
+          _sum: { paid_amount: true },
           where: dateFilter,
         });
-        paymentsTotal = new Decimal(res._sum?.amount?.toString() || 0);
+        paymentsTotal = new Decimal(res._sum?.paid_amount?.toString() || 0);
       } catch (e) {
         console.error('[AnalyticsService] Error aggregating payments:', e.message);
       }
 
       let refundsTotal = new Decimal(0);
       try {
-        const res = await prisma.refund.aggregate({
+        const res = await prisma.refunds.aggregate({
           _sum: { amount: true },
           where: dateFilter,
         });
@@ -98,7 +98,7 @@ class AnalyticsService {
 
       let activeTariff = null;
       try {
-        activeTariff = await prisma.tariff.findFirst({
+        activeTariff = await prisma.tariffs.findFirst({
           where: { code: 'TUITION_MONTHLY' },
           orderBy: { valid_from: 'desc' },
         });
@@ -119,7 +119,7 @@ class AnalyticsService {
             groupCharged = groupCharged.add(new Decimal(charge.total_amount?.toString() || 0));
           }
           for (const payment of child.payments || []) {
-            groupPaid = groupPaid.add(new Decimal(payment.amount?.toString() || 0));
+            groupPaid = groupPaid.add(new Decimal(payment.paid_amount?.toString() || 0));
           }
         }
 
@@ -215,7 +215,7 @@ class AnalyticsService {
   }
 
   async getDebtsReport() {
-    const children = await prisma.child.findMany({
+    const children = await prisma.children.findMany({
       select: {
         id: true,
         first_name: true,
@@ -230,7 +230,7 @@ class AnalyticsService {
         payments: {
           select: {
             id: true,
-            amount: true,
+            paid_amount: true,
             refunds: {
               select: {
                 id: true,
@@ -254,7 +254,7 @@ class AnalyticsService {
       );
 
       const totalPaid = child.payments.reduce(
-        (acc, p) => acc.add(new Decimal(p.amount?.toString() || 0)),
+        (acc, p) => acc.add(new Decimal(p.paid_amount?.toString() || 0)),
         new Decimal(0)
       );
 
@@ -303,7 +303,7 @@ class AnalyticsService {
   async getRevenueForecast() {
     let activeTariff = null;
     try {
-      activeTariff = await prisma.tariff.findFirst({
+      activeTariff = await prisma.tariffs.findFirst({
         where: { code: 'TUITION_MONTHLY' },
         orderBy: { valid_from: 'desc' },
       });
@@ -314,11 +314,11 @@ class AnalyticsService {
     const baseTuitionPrice = new Decimal(activeTariff?.amount?.toString() || 15000);
     const WORK_DAYS_PER_MONTH = 21;
 
-    const children = await prisma.child.findMany({
+    const children = await prisma.children.findMany({
       select: {
         id: true,
         birth_date: true,
-        discount: true,
+        discounts: true,
       },
     });
 
@@ -326,8 +326,8 @@ class AnalyticsService {
     let expectedMealsRevenue = new Decimal(0);
 
     for (const child of children) {
-      const discountPct = child.discount
-        ? new Decimal(child.discount.percent?.toString() || 0)
+      const discountPct = child.discounts
+        ? new Decimal(child.discounts.percentage?.toString() || 0)
         : new Decimal(0);
 
       const discountMultiplier = new Decimal(1).sub(discountPct.div(100));
@@ -370,7 +370,7 @@ class AnalyticsService {
 
     let activeTariff = null;
     try {
-      activeTariff = await prisma.tariff.findFirst({
+      activeTariff = await prisma.tariffs.findFirst({
         where: { code: 'TUITION_MONTHLY' },
         orderBy: { valid_from: 'desc' },
       });
@@ -500,4 +500,4 @@ class AnalyticsService {
   }
 }
 
-module.exports = new AnalyticsService()
+module.exports = new AnalyticsService();
