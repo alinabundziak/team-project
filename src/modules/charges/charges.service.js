@@ -52,6 +52,10 @@ function toChargeDto(c) {
 async function requireChild(rawChildId, user) {
   const childId = parseId(rawChildId, 'childId');
   if (user) {
+    const roleName = user.role?.name || user.roleName || user.role;
+    if (roleName !== 'ADMIN' && roleName !== 'PARENT') {
+      throw new AppError(403, 'У вас немає доступу до фінансових даних');
+    }
     return await assertChildAccess(user, childId);
   }
   const child = await childrenRepo.findById(childId);
@@ -168,24 +172,35 @@ async function getFinancialHistory(rawChildId, user) {
         },
       };
     }),
-    ...payments.map((p) => ({
-      type: 'PAYMENT',
-      id: p.id,
-      date: p.created_at,
-      amount: p.amount.toFixed(2),
-    })),
+    ...payments.map((p) => {
+      const status = p.status || 'PAID';
+      const paidAmount = p.paid_amount !== undefined && p.paid_amount !== null
+        ? new Decimal(p.paid_amount).toFixed(2)
+        : new Decimal(p.amount).toFixed(2);
+
+      return {
+        type: 'PAYMENT',
+        id: p.id,
+        date: p.created_at,
+        amount: new Decimal(p.amount).toFixed(2),
+        details: {
+          status,
+          paidAmount,
+        },
+      };
+    }),
     ...refunds.map((r) => ({
       type: 'REFUND',
       id: r.id,
       date: r.created_at,
-      amount: r.amount.toFixed(2),
+      amount: new Decimal(r.amount).toFixed(2),
       details: { paymentId: r.payment_id, reason: r.reason },
     })),
     ...adjustments.map((a) => ({
       type: 'ADJUSTMENT',
       id: a.id,
       date: a.created_at,
-      amount: a.amount.toFixed(2),
+      amount: new Decimal(a.amount).toFixed(2),
       details: {
         chargeId: a.charge_id,
         direction: a.direction,

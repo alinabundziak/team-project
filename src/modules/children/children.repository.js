@@ -16,7 +16,7 @@ function count(where) {
 }
 
 function findById(id) {
-  return prisma.children.findUnique({ where: { id }, include: withParents });
+  return prisma.children.findUnique({ where: { id: Number(id) }, include: withParents });
 }
 
 function create(data) {
@@ -24,30 +24,42 @@ function create(data) {
 }
 
 function update(id, data) {
-  return prisma.children.update({ where: { id }, data, include: withParents });
+  return prisma.children.update({ where: { id: Number(id) }, data, include: withParents });
 }
 
 function remove(id) {
-  return prisma.children.delete({ where: { id } });
+  return prisma.children.delete({ where: { id: Number(id) } });
 }
 
 function findGroupById(id) {
-  return prisma.groups.findUnique({ where: { id } });
+  return prisma.groups.findUnique({ where: { id: Number(id) } });
 }
 
 function countSubscriptions(childId) {
-  return prisma.subscriptions.count({ where: { child_id: childId } });
+  return prisma.subscriptions.count({ where: { child_id: Number(childId) } });
 }
 
 function countCharges(childId) {
-  return prisma.charges.count({ where: { child_id: childId } });
+  return prisma.charges.count({ where: { child_id: Number(childId) } });
 }
 
 function findParentByUserId(userId) {
-  return prisma.parents.findUnique({ where: { user_id: userId } });
+  return prisma.parents.findUnique({ where: { user_id: Number(userId) } });
 }
 
+async function hasParentAccess(childId, parentId) {
+  const relation = await prisma.child_parents.findUnique({
+    where: {
+      child_id_parent_id: {
+        child_id: Number(childId),
+        parent_id: Number(parentId),
+      },
+    },
+  });
+  return Boolean(relation);
+}
 module.exports = {
+  hasParentAccess,
   findMany,
   count,
   findById,

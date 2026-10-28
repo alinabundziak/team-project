@@ -6,7 +6,7 @@ const { isSupportedPercent } = require('../discounts/discounts.service');
 const AppError = require('../../utils/AppError');
 const parseId = require('../../utils/parseId');
 const cfg = require('../../config/pricing');
-const { calculateTuition } = require('./tuition.calculator');
+const { calculateTuition: calculateTuitionCalc } = require('./tuition.calculator');
 const pricingRepo = require('./pricing.repository');
 const { getTariffAmount } = require('../tariffs/tariffs.service');
 const { mealPriceForDays } = require('./meal.calculator');
@@ -33,7 +33,7 @@ class PricingService {
 
         return await prisma.pricing_plans.create({
             data: {
-                name: data.name || 'Базовий тариф',
+                name: data.name || 'Р‘Р°Р·РѕРІРёР№ С‚Р°СЂРёС„',
                 amount: new Decimal(data.amount).toFixed(2),
                 effective_from: data.effectiveFrom ? new Date(data.effectiveFrom) : new Date(),
                 is_active: true
@@ -182,7 +182,7 @@ class PricingService {
         }
 
         const selectedPeriod = isAnnual ? 'ANNUAL' : 'MONTHLY';
-        const tuitionCalc = calculateTuition({
+        const tuitionCalc = calculateTuitionCalc({
             baseFee: baseTuition,
             discountPercent: benefitPercent,
             period: selectedPeriod
@@ -253,6 +253,7 @@ class PricingService {
                 where: {
                     children: {
                         child_parents: { some: { parent_id: parent.id } }
+
                     }
                 },
                 include: { children: true }
@@ -283,7 +284,7 @@ class PricingService {
         if (data.status) {
             const validStatuses = ['PENDING', 'PAID', 'PARTIALLY_PAID', 'CANCELLED'];
             if (!validStatuses.includes(data.status)) {
-                throw new Error(`Некоректний статус платежу: ${data.status}`);
+                throw new Error(`РќРµРєРѕСЂРµРєС‚РЅРёР№ СЃС‚Р°С‚СѓСЃ РїР»Р°С‚РµР¶Сѓ: ${data.status}`);
             }
             updateData.status = data.status;
         }
@@ -292,7 +293,7 @@ class PricingService {
             const paidNum = Number(data.paidAmount);
 
             if (isNaN(paidNum) || paidNum < 0) {
-                throw new Error("Сума платежу не може бути від'ємною");
+                throw new Error("РЎСѓРјР° РїР»Р°С‚РµР¶Сѓ РЅРµ РјРѕР¶Рµ Р±СѓС‚Рё РІС–Рґ'С”РјРЅРѕСЋ");
             }
 
             updateData.paid_amount = new Decimal(paidNum).toFixed(2);
@@ -364,6 +365,7 @@ class PricingService {
     }
 }
 
+
 function parsePeriod(value) {
     if (value === undefined) return 'MONTHLY';
 
@@ -374,7 +376,7 @@ function parsePeriod(value) {
     if (!PERIODS.includes(p)) {
         throw new AppError(
             400,
-            `period має бути одним із: ${PERIODS.join(', ')}`
+            `period РјР°С” Р±СѓС‚Рё РѕРґРЅРёРј С–Р·: ${PERIODS.join(', ')}`
         );
     }
 
@@ -386,7 +388,7 @@ async function resolveDiscount(child, overrideId) {
         const d = await discountsRepo.findById(overrideId);
 
         if (!d) {
-            throw new AppError(404, 'Знижку не знайдено');
+            throw new AppError(404, 'Р—РЅРёР¶РєСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
         }
 
         return d;
@@ -399,7 +401,7 @@ async function resolveDiscount(child, overrideId) {
     if (!d) {
         throw new AppError(
             409,
-            'Знижку дитини не знайдено в довіднику'
+            'Р—РЅРёР¶РєСѓ РґРёС‚РёРЅРё РЅРµ Р·РЅР°Р№РґРµРЅРѕ РІ РґРѕРІС–РґРЅРёРєСѓ'
         );
     }
 
@@ -417,7 +419,7 @@ async function estimateTuition(rawChildId, query = {}) {
     const child = await childrenRepo.findById(childId);
 
     if (!child) {
-        throw new AppError(404, 'Дитину не знайдено');
+        throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
     }
 
     const discount = await resolveDiscount(child, overrideId);
@@ -428,7 +430,7 @@ async function estimateTuition(rawChildId, query = {}) {
     if (!isSupportedPercent(percent)) {
         throw new AppError(
             409,
-            `Непідтримуваний розмір знижки: ${percent.toString()}%. Дозволено: ${cfg.ALLOWED_DISCOUNT_PERCENTS.join(', ')}`
+            `РќРµРїС–РґС‚СЂРёРјСѓРІР°РЅРёР№ СЂРѕР·РјС–СЂ Р·РЅРёР¶РєРё: ${percent.toString()}%. Р”РѕР·РІРѕР»РµРЅРѕ: ${cfg.ALLOWED_DISCOUNT_PERCENTS.join(', ')}`
         );
     }
 
@@ -437,7 +439,7 @@ async function estimateTuition(rawChildId, query = {}) {
         startOfMonthUtc(todayUtc())
     );
 
-    const calculation = calculateTuition({
+    const calculation = calculateTuitionCalc({
         baseFee,
         discountPercent: percent,
         period
@@ -462,7 +464,7 @@ function parseDays(value) {
     if (typeof value !== 'string' || !/^\d+$/.test(value)) {
         throw new AppError(
             400,
-            'days має бути цілим числом від 1 до 31'
+            'days РјР°С” Р±СѓС‚Рё С†С–Р»РёРј С‡РёСЃР»РѕРј РІС–Рґ 1 РґРѕ 31'
         );
     }
 
@@ -471,7 +473,7 @@ function parseDays(value) {
     if (n < 1 || n > 31) {
         throw new AppError(
             400,
-            'days має бути цілим числом від 1 до 31'
+            'days РјР°С” Р±СѓС‚Рё С†С–Р»РёРј С‡РёСЃР»РѕРј РІС–Рґ 1 РґРѕ 31'
         );
     }
 
@@ -484,7 +486,7 @@ async function calculateMealAmount(age, days, periodStart) {
     if (!rate) {
         throw new AppError(
             409,
-            `Не знайдено ціну харчування для віку ${age} на ${formatDateOnly(periodStart)}. Для нарахування без харчування вкажіть mealDays: 0`
+            `РќРµ Р·РЅР°Р№РґРµРЅРѕ С†С–РЅСѓ С…Р°СЂС‡СѓРІР°РЅРЅСЏ РґР»СЏ РІС–РєСѓ ${age} РЅР° ${formatDateOnly(periodStart)}. Р”Р»СЏ РЅР°СЂР°С…СѓРІР°РЅРЅСЏ Р±РµР· С…Р°СЂС‡СѓРІР°РЅРЅСЏ РІРєР°Р¶С–С‚СЊ mealDays: 0`
         );
     }
 
@@ -511,7 +513,7 @@ async function getChildDiscountPercent(child) {
     if (!isSupportedPercent(percent)) {
         throw new AppError(
             409,
-            `Непідтримуваний розмір знижки: ${percent.toString()}%`
+            `РќРµРїС–РґС‚СЂРёРјСѓРІР°РЅРёР№ СЂРѕР·РјС–СЂ Р·РЅРёР¶РєРё: ${percent.toString()}%`
         );
     }
 
@@ -525,7 +527,7 @@ async function estimateMeals(rawChildId, query = {}) {
     const child = await childrenRepo.findById(childId);
 
     if (!child) {
-        throw new AppError(404, 'Дитину не знайдено');
+        throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
     }
 
     const age = calculateAge(child.birth_date);
