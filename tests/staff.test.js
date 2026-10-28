@@ -420,7 +420,7 @@ test("не дозволяє змінити предмет викладача, п
         },
         teacher_activities: {
             findMany: async () => [
-                { activity: { name: "Музика" } }
+                { activities: { name: "Музика" } }
             ],
             count: async () => 1
         },
@@ -803,8 +803,8 @@ function prepareData() {
                 { role: null, employee: teacher1 }
             ],
             schedules: [
-                { teacher: educator1 },
-                { teacher: educator2 }
+                { employees: educator1 },
+                { employees: educator2 }
             ]
         }),
         makeGroup(2)

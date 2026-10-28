@@ -35,7 +35,6 @@ app.use("/api/parents", require("./modules/parents/parents.routes"));
 app.use("/api/groups", groupsRoutes);
 app.use("/api/rooms", roomsRoutes);
 app.use("/api/staff", staffRoutes);
-app.use("/api/rooms", roomsRoutes);
 app.use("/api/activities", activitiesRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/expense-settings", expenseSettingsRoutes);

@@ -146,7 +146,7 @@ async function updateStaff(id, data, includeSalary = false) {
                 await prisma.teacher_activities.findMany({
                     where: { employee_id: id },
                     select: {
-                        activity: {
+                        activities: {
                             select: { name: true }
                         }
                     }
@@ -158,10 +158,10 @@ async function updateStaff(id, data, includeSalary = false) {
                     : "";
 
             const hasMismatchedActivity = activityAssignments.some(
-                ({ activity }) =>
+                ({ activities }) =>
                     !newSubject ||
                     newSubject !==
-                        activity.name.trim().toLocaleLowerCase("uk-UA")
+                        activities.name.trim().toLocaleLowerCase("uk-UA")
             );
 
             if (hasMismatchedActivity) {
@@ -393,7 +393,7 @@ async function getStaffDistributionAnalysis(options = {}) {
 
                 schedules: {
                     select: {
-                        teacher: {
+                        employees: {
                             select: {
                                 id: true,
                                 first_name: true,
@@ -460,7 +460,7 @@ async function getStaffDistributionAnalysis(options = {}) {
         }
 
         for (const schedule of group.schedules || []) {
-            addStaff(schedule.teacher, "SCHEDULE");
+            addStaff(schedule.employees, "SCHEDULE");
         }
 
         const assignedStaff = [...groupStaff.values()];

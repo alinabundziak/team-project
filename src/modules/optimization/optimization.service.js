@@ -154,7 +154,7 @@ async function getOptimizationRecommendations() {
 
                 schedules: {
                     select: {
-                        teacher: {
+                        employees: {
                             select: {
                                 id: true,
                                 first_name: true,
@@ -308,8 +308,8 @@ async function getOptimizationRecommendations() {
         }
 
         for (const schedule of group.schedules || []) {
-            if (schedule.teacher) {
-                assignedEmployeeIds.add(schedule.teacher.id);
+            if (schedule.employees) {
+                assignedEmployeeIds.add(schedule.employees.id);
             }
         }
     }
@@ -338,7 +338,7 @@ async function getOptimizationRecommendations() {
         }
 
         for (const schedule of group.schedules || []) {
-            const employee = schedule.teacher;
+            const employee = schedule.employees;
 
             if (employee && !staffById.has(employee.id)) {
                 staffById.set(employee.id, {
