@@ -1,6 +1,7 @@
 const prisma = require('../../config/prisma');
 const Decimal = require('decimal.js');
 const childrenRepo = require('../children/children.repository');
+const { assertChildAccess } = require('../children/children.access');
 const discountsRepo = require('../discounts/discounts.repository');
 const { isSupportedPercent } = require('../discounts/discounts.service');
 const AppError = require('../../utils/AppError');
@@ -408,7 +409,7 @@ async function resolveDiscount(child, overrideId) {
     return d;
 }
 
-async function estimateTuition(rawChildId, query = {}) {
+async function estimateTuition(rawChildId, query = {}, user) {
     const childId = parseId(rawChildId, 'childId');
     const period = parsePeriod(query.period);
 
@@ -416,7 +417,7 @@ async function estimateTuition(rawChildId, query = {}) {
         ? undefined
         : parseId(query.discountId, 'discountId');
 
-    const child = await childrenRepo.findById(childId);
+    const child = await assertChildAccess(user, childId);
 
     if (!child) {
         throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
@@ -520,11 +521,11 @@ async function getChildDiscountPercent(child) {
     return percent;
 }
 
-async function estimateMeals(rawChildId, query = {}) {
+async function estimateMeals(rawChildId, query = {}, user) {
     const childId = parseId(rawChildId, 'childId');
     const days = parseDays(query.days);
 
-    const child = await childrenRepo.findById(childId);
+    const child = await assertChildAccess(user, childId);
 
     if (!child) {
         throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
