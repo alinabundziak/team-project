@@ -20,9 +20,10 @@ async function assertChildAccess(user, childId) {
     if (ownParentId !== null && child.parent_id === ownParentId) {
       return child;
     }
+    throw new AppError(403, 'У вас немає доступу до цієї дитини');
   }
 
-  throw new AppError(404, 'Дитину не знайдено');
+  throw new AppError(403, 'У вас немає доступу до фінансових даних');
 }
 
 module.exports = { assertChildAccess, getOwnParentId };
