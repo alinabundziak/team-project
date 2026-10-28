@@ -19,7 +19,7 @@ const parentSelect = {
 };
 
 function findMany({ where, skip, take }) {
-  return prisma.child.findMany({
+  return prisma.children.findMany({
     where,
     skip,
     take,
@@ -29,25 +29,25 @@ function findMany({ where, skip, take }) {
 }
 
 function count(where) {
-  return prisma.child.count({ where });
+  return prisma.children.count({ where });
 }
 
 function findById(id) {
-  return prisma.child.findUnique({
+  return prisma.children.findUnique({
     where: { id: Number(id) },
     select: childSelect,
   });
 }
 
 function create(data) {
-  return prisma.child.create({
+  return prisma.children.create({
     data,
     select: childSelect,
   });
 }
 
 function update(id, data) {
-  return prisma.child.update({
+  return prisma.children.update({
     where: { id: Number(id) },
     data,
     select: childSelect,
@@ -55,26 +55,38 @@ function update(id, data) {
 }
 
 function remove(id) {
-  return prisma.child.delete({ where: { id: Number(id) } });
+  return prisma.children.delete({ where: { id: Number(id) } });
 }
 
 function findGroupById(id) {
-  return prisma.group.findUnique({ where: { id: Number(id) } });
+  return prisma.groups.findUnique({ where: { id: Number(id) } });
 }
 
 function countSubscriptions(childId) {
-  return prisma.subscription.count({ where: { child_id: Number(childId) } });
+  return prisma.subscriptions.count({ where: { child_id: Number(childId) } });
 }
 
 function findParentByUserId(userId) {
-  return prisma.parent.findUnique({
+  return prisma.parents.findUnique({
     where: { user_id: Number(userId) },
     select: parentSelect,
   });
 }
 
+async function hasParentAccess(childId, parentId) {
+  const relation = await prisma.child_parents.findUnique({
+    where: {
+      child_id_parent_id: {
+        child_id: Number(childId),
+        parent_id: Number(parentId),
+      },
+    },
+  });
+  return Boolean(relation);
+}
+
 function countCharges(childId) {
-  return prisma.charge.count({ where: { child_id: Number(childId) } });
+  return prisma.charges.count({ where: { child_id: Number(childId) } });
 }
 
 module.exports = {
@@ -87,5 +99,6 @@ module.exports = {
   findGroupById,
   countSubscriptions,
   findParentByUserId,
+  hasParentAccess,
   countCharges,
 };

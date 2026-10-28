@@ -12,7 +12,7 @@ function toPaymentDto(p) {
   return {
     id: p.id,
     childId: p.child_id,
-    amount: new Decimal(p.amount).toFixed(2),
+    amount: p.amount ? new Decimal(p.amount).toFixed(2) : '0.00',
     createdAt: p.created_at,
   };
 }
