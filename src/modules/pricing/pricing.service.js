@@ -1,5 +1,17 @@
 const prisma = require('../../config/prisma');
 const Decimal = require('decimal.js');
+const childrenRepo = require('../children/children.repository');
+const discountsRepo = require('../discounts/discounts.repository');
+const { isSupportedPercent } = require('../discounts/discounts.service');
+const AppError = require('../../utils/AppError');
+const parseId = require('../../utils/parseId');
+const cfg = require('../../config/pricing');
+const { calculateTuition } = require('./tuition.calculator');
+const pricingRepo = require('./pricing.repository');
+const { getTariffAmount } = require('../tariffs/tariffs.service');
+const { mealPriceForDays } = require('./meal.calculator');
+const {calculateAge, todayUtc, startOfMonthUtc, formatDateOnly} = require('../../utils/age');
+const PERIODS = ['MONTHLY', 'ANNUAL'];
 
 const MEAL_RATES_BY_AGE = {
     2: 300,
@@ -239,7 +251,9 @@ class PricingService {
 
             return await prisma.payments.findMany({
                 where: {
-                    children: { parent_id: parent.id }
+                    children: {
+                        child_parents: { some: { parent_id: parent.id } }
+                    }
                 },
                 include: { children: true }
             });
@@ -349,25 +363,6 @@ class PricingService {
         });
     }
 }
-
-const childrenRepo = require('../children/children.repository');
-const discountsRepo = require('../discounts/discounts.repository');
-const { isSupportedPercent } = require('../discounts/discounts.service');
-const AppError = require('../../utils/AppError');
-const parseId = require('../../utils/parseId');
-const cfg = require('../../config/pricing');
-const { calculateTuition } = require('./tuition.calculator');
-const pricingRepo = require('./pricing.repository');
-const { getTariffAmount } = require('../tariffs/tariffs.service');
-const { mealPriceForDays } = require('./meal.calculator');
-const {
-    calculateAge,
-    todayUtc,
-    startOfMonthUtc,
-    formatDateOnly
-} = require('../../utils/age');
-
-const PERIODS = ['MONTHLY', 'ANNUAL'];
 
 function parsePeriod(value) {
     if (value === undefined) return 'MONTHLY';

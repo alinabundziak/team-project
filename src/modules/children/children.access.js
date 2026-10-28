@@ -17,9 +17,8 @@ async function assertChildAccess(user, childId) {
 
   if (user.role === ROLES.PARENT) {
     const ownParentId = await getOwnParentId(user.id);
-    if (ownParentId !== null && child.parent_id === ownParentId) {
-      return child;
-    }
+    const linked = (child.child_parents || []).some((l) => l.parent_id === ownParentId);
+    if (ownParentId !== null && linked) return child;
   }
 
   throw new AppError(404, 'Дитину не знайдено');

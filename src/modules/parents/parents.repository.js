@@ -37,7 +37,7 @@ function remove(id) {
 }
 
 function countChildren(parentId) {
-  return prisma.children.count({ where: { parent_id: parentId } });
+  return prisma.child_parents.count({ where: { parent_id: parentId } });
 }
 
 module.exports = {
