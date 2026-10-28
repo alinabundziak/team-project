@@ -15,14 +15,16 @@ async function sumByPayment(paymentId, tx = prisma) {
 
 async function sumByChild(childId, tx = prisma) {
   const res = await tx.refunds.aggregate({
-    where: { payment: { child_id: childId } },
+    where: { payments: { child_id: childId } }, 
     _sum: { amount: true },
   });
   return res._sum.amount ?? 0;
 }
 
 function findManyByChild(childId, tx = prisma) {
-  return tx.refunds.findMany({ where: { payment: { child_id: childId } } });
+  return tx.refunds.findMany({ 
+    where: { payments: { child_id: childId } } 
+  });
 }
 
 async function createWithLimitCheck(paymentId, amountDecimal, maxAllowedDecimal, data) {
