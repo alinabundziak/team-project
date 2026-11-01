@@ -124,7 +124,7 @@ async function getRooms(req, res) {
     try {
         const rooms = await service.getRooms();
 
-        return res.status(200).json(rooms);
+        return res.status(200).json({ data: rooms });
     } catch (error) {
         return handleRoomError(error, res);
     }
@@ -144,7 +144,7 @@ async function getRoomById(req, res) {
     try {
         const room = await service.getRoomById(id);
 
-        return res.status(200).json(room);
+        return res.status(200).json({ data: room });
     } catch (error) {
         return handleRoomError(error, res);
     }
@@ -164,7 +164,7 @@ async function createRoom(req, res) {
     try {
         const room = await service.createRoom(result.data);
 
-        return res.status(201).json(room);
+        return res.status(201).json({ data: room });
     } catch (error) {
         return handleRoomError(error, res);
     }
@@ -194,7 +194,7 @@ async function updateRoom(req, res) {
     try {
         const room = await service.updateRoom(id, result.data);
 
-        return res.status(200).json(room);
+        return res.status(200).json({ data: room });
     } catch (error) {
         return handleRoomError(error, res);
     }
@@ -215,7 +215,9 @@ async function deleteRoom(req, res) {
         await service.deleteRoom(id);
 
         return res.status(200).json({
-            message: "Кімнату успішно видалено"
+            data: {
+                message: "Кімнату успішно видалено"
+            }
         });
     } catch (error) {
         return handleRoomError(error, res);

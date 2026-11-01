@@ -14,7 +14,7 @@ function toRefundDto(r, childId) {
     id: r.id,
     childId,
     paymentId: r.payment_id,
-    amount: r.amount.toFixed(2),
+    amount: typeof r.amount === 'object' && r.amount.toFixed ? r.amount.toFixed(2) : String(r.amount),
     reason: r.reason,
     createdAt: r.created_at,
   };
@@ -49,18 +49,30 @@ async function createRefund(rawChildId, input) {
     throw new AppError(404, 'Оплату не знайдено');
   }
 
-  const alreadyRefunded = new Decimal(await repo.sumByPayment(paymentId));
-  const available = new Decimal(payment.amount).minus(alreadyRefunded);
-  if (amount.gt(available)) {
-    throw new AppError(409, `Сума повернення перевищує доступну по цій оплаті (${available.toFixed(2)})`);
+  if (payment.status && payment.status !== 'PAID' && payment.status !== 'COMPLETED') {
+    throw new AppError(409, 'Неможливо виконати повернення коштів за неоплаченим або скасованим платежем');
+  }
+
+  const paidBase = (payment.paid_amount !== undefined && payment.paid_amount !== null)
+    ? payment.paid_amount
+    : payment.amount;
+
+  const actualPaidAmount = new Decimal(paidBase);
+  if (actualPaidAmount.lte(0)) {
+    throw new AppError(409, 'Фактично сплачена сума за цим платежем дорівнює 0');
   }
 
   try {
-    const refund = await repo.create({
-      payment_id: paymentId,
-      amount: amount.toFixed(2),
-      reason,
-    });
+    const refund = await repo.createWithLimitCheck(
+      paymentId,
+      amount,
+      actualPaidAmount,
+      {
+        payment_id: paymentId,
+        amount: amount.toFixed(2),
+        reason,
+      }
+    );
     return toRefundDto(refund, childId);
   } catch (err) {
     if (err.code === 'P2003') throw new AppError(404, 'Оплату не знайдено');

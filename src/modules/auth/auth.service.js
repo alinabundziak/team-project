@@ -4,6 +4,8 @@ const { toPublicUser } = require('../users/users.service');
 const { comparePassword } = require('../../utils/password');
 const AppError = require('../../utils/AppError');
 const { secret, expiresIn, algorithm } = require('../../config/jwt');
+const bcrypt = require('bcryptjs');
+const DUMMY_HASH = bcrypt.hashSync('dummy-password', Number(process.env.BCRYPT_SALT_ROUNDS) || 10);
 
 async function login({ email, password }) {
   if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
@@ -11,17 +13,19 @@ async function login({ email, password }) {
   }
 
   const user = await repo.findByEmail(email.trim().toLowerCase());
-  const passwordOk = user ? await comparePassword(password, user.password_hash) : false;
+  const passwordOk = await comparePassword(password, user ? user.password_hash : DUMMY_HASH);
 
   if (!user || !passwordOk) {
     throw new AppError(401, 'Невірний email або пароль');
   }
 
-  if (!user.roles) {
+  const roleName = user.roles ? user.roles.name : (user.role ? user.role.name : null);
+
+  if (!roleName) {
     throw new AppError(403, 'Користувачу не призначено роль');
   }
 
-  const token = jwt.sign({ role: user.roles.name }, secret, {
+  const token = jwt.sign({ role: roleName }, secret, {
     subject: String(user.id),
     expiresIn,
     algorithm,

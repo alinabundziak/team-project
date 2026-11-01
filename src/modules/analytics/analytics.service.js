@@ -1,8 +1,38 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const Decimal = require('decimal.js');
-const prisma = new PrismaClient();
+
+function calculateAgeInYears(birthDate) {
+  if (!birthDate) return 3;
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 class AnalyticsService {
+  async getMealRateByAge(age) {
+    try {
+      const rate = await prisma.meal_rates.findFirst({
+        where: { age: { lte: age } },
+        orderBy: [{ age: 'desc' }, { valid_from: 'desc' }],
+      });
+      if (rate) {
+        return new Decimal(rate.daily_rate.toString());
+      }
+    } catch (err) {
+      console.error('[AnalyticsService] Error getting meal rate:', err.message);
+    }
+
+    if (age <= 2) return new Decimal(300);
+    if (age === 3) return new Decimal(400);
+    if (age === 4) return new Decimal(500);
+    return new Decimal(600);
+  }
+
   async getFinancialSummary(startDate, endDate) {
     try {
       const dateFilter = {};
@@ -15,41 +45,35 @@ class AnalyticsService {
 
       let chargesTotal = new Decimal(0);
       try {
-        if (prisma.charges) {
-          const res = await prisma.charges.aggregate({
-            _sum: { total_amount: true },
-            where: dateFilter,
-          });
-          chargesTotal = new Decimal(res?._sum?.total_amount?.toString() || 0);
-        }
+        const res = await prisma.charges.aggregate({
+          _sum: { total_amount: true },
+          where: dateFilter,
+        });
+        chargesTotal = new Decimal(res._sum?.total_amount?.toString() || 0);
       } catch (e) {
-        chargesTotal = new Decimal(0);
+        console.error('[AnalyticsService] Error aggregating charges:', e.message);
       }
 
       let paymentsTotal = new Decimal(0);
       try {
-        if (prisma.payments) {
-          const res = await prisma.payments.aggregate({
-            _sum: { paid_amount: true },
-            where: { ...dateFilter, status: 'PAID' },
-          });
-          paymentsTotal = new Decimal(res?._sum?.paid_amount?.toString() || 0);
-        }
+        const res = await prisma.payments.aggregate({
+          _sum: { paid_amount: true },
+          where: dateFilter,
+        });
+        paymentsTotal = new Decimal(res._sum?.paid_amount?.toString() || 0);
       } catch (e) {
-        paymentsTotal = new Decimal(0);
+        console.error('[AnalyticsService] Error aggregating payments:', e.message);
       }
 
       let refundsTotal = new Decimal(0);
       try {
-        if (prisma.refunds) {
-          const res = await prisma.refunds.aggregate({
-            _sum: { amount: true },
-            where: dateFilter,
-          });
-          refundsTotal = new Decimal(res?._sum?.amount?.toString() || 0);
-        }
+        const res = await prisma.refunds.aggregate({
+          _sum: { amount: true },
+          where: dateFilter,
+        });
+        refundsTotal = new Decimal(res._sum?.amount?.toString() || 0);
       } catch (e) {
-        refundsTotal = new Decimal(0);
+        console.error('[AnalyticsService] Error aggregating refunds:', e.message);
       }
 
       const actualRevenue = paymentsTotal.sub(refundsTotal);
@@ -58,35 +82,33 @@ class AnalyticsService {
 
       let groups = [];
       try {
-        if (prisma.groups) {
-          groups = await prisma.groups.findMany({
-            include: {
-              children: {
-                include: {
-                  charges: { where: dateFilter },
-                  payments: { where: { ...dateFilter, status: 'PAID' } },
-                },
+        groups = await prisma.groups.findMany({
+          include: {
+            children: {
+              include: {
+                charges: { where: dateFilter },
+                payments: { where: dateFilter },
               },
             },
-          });
-        }
+          },
+        });
       } catch (e) {
-        groups = [];
+        console.error('[AnalyticsService] Error fetching groups:', e.message);
       }
 
-      const activePricingPlan = await prisma.pricing_plans?.findFirst({
-        where: { is_active: true },
-        orderBy: { created_at: 'desc' },
-      }).catch(() => null);
+      let activeTariff = null;
+      try {
+        activeTariff = await prisma.tariffs.findFirst({
+          where: { code: 'TUITION_MONTHLY' },
+          orderBy: { valid_from: 'desc' },
+        });
+      } catch (e) {
+        console.error('[AnalyticsService] Error fetching active tariff:', e.message);
+      }
 
-      const activeMealRate = await prisma.meal_rates?.findFirst({
-        where: { is_active: true },
-        orderBy: { created_at: 'desc' },
-      }).catch(() => null);
-
-      const baseTuitionPrice = new Decimal(activePricingPlan?.price?.toString() || 15000);
-      const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
-      const avgRevenuePerChild = baseTuitionPrice.mul(0.9).add(baseDailyMealFee.mul(22));
+      const baseTuitionPrice = new Decimal(activeTariff?.amount?.toString() || 15000);
+      const baseDailyMealFee = new Decimal(400);
+      const avgRevenuePerChild = baseTuitionPrice.mul(0.9).add(baseDailyMealFee.mul(21));
 
       const groupsProfitability = groups.map((group) => {
         let groupCharged = new Decimal(0);
@@ -105,7 +127,7 @@ class AnalyticsService {
         const teacherSalary = new Decimal(2000).mul(N).add(new Decimal(500).mul(Math.max(0, N - 12)));
         const assistantSalary = new Decimal(20000);
         const groupStaffExpenses = teacherSalary.add(assistantSalary);
-        const groupRentExpenses = new Decimal(50000); 
+        const groupRentExpenses = new Decimal(50000);
         const groupTotalExpenses = groupStaffExpenses.add(groupRentExpenses);
 
         const breakEvenChildrenCount = avgRevenuePerChild.gt(0)
@@ -149,11 +171,9 @@ class AnalyticsService {
 
       let teachersCount = 0;
       try {
-        if (prisma.employees) {
-          teachersCount = await prisma.employees.count({ where: { position: 'TEACHER' } });
-        }
+        teachersCount = await prisma.employees.count({ where: { position: 'TEACHER' } });
       } catch (e) {
-        teachersCount = 0;
+        console.error('[AnalyticsService] Error counting teachers:', e.message);
       }
 
       const teachersSalaries = new Decimal(teachersCount).mul(40000);
@@ -172,8 +192,8 @@ class AnalyticsService {
           endDate: endDate || 'всі дати',
         },
         revenue: {
-          chargesTotal: chargesTotal.toNumber(),  
-          actualRevenue: actualRevenue.toNumber(), 
+          chargesTotal: chargesTotal.toNumber(),
+          actualRevenue: actualRevenue.toNumber(),
         },
         totalDebt: totalDebt.toNumber(),
         expenses: {
@@ -183,33 +203,49 @@ class AnalyticsService {
           totalExpenses: totalExpenses.toNumber(),
         },
         financialResult: {
-          accrualProfit: accrualProfit.toNumber(), 
-          cashProfit: cashProfit.toNumber(),       
+          accrualProfit: accrualProfit.toNumber(),
+          cashProfit: cashProfit.toNumber(),
         },
-        groupsProfitability, 
+        groupsProfitability,
       };
     } catch (err) {
-      console.error("Error in getFinancialSummary:", err);
+      console.error('[AnalyticsService] Error in getFinancialSummary:', err);
       throw err;
     }
   }
 
   async getDebtsReport() {
     const children = await prisma.children.findMany({
-      include: {
-        charges: true,
-        payments: {
-          where: {
-            status: 'PAID',
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        charges: {
+          select: {
+            id: true,
+            total_amount: true,
+            period: true,
           },
         },
-        refunds: true, 
+        payments: {
+          select: {
+            id: true,
+            paid_amount: true,
+            refunds: {
+              select: {
+                id: true,
+                amount: true,
+              },
+            },
+          },
+        },
       },
     });
 
     const debtors = [];
     let totalDebtAmount = new Decimal(0);
     let totalOverdueAmount = new Decimal(0);
+    const now = new Date();
 
     for (const child of children) {
       const totalCharged = child.charges.reduce(
@@ -222,17 +258,26 @@ class AnalyticsService {
         new Decimal(0)
       );
 
-      const totalRefunded = (child.refunds || []).reduce(
+      const childRefunds = child.payments.flatMap((p) => p.refunds || []);
+      const totalRefunded = childRefunds.reduce(
         (acc, r) => acc.add(new Decimal(r.amount?.toString() || 0)),
         new Decimal(0)
       );
 
       const netPaid = totalPaid.sub(totalRefunded);
-
       const debt = totalCharged.sub(netPaid);
 
       if (debt.isPositive() && !debt.isZero()) {
-        const overdueDebt = debt; 
+        const overdueCharged = child.charges.reduce((acc, c) => {
+          const dueDate = c.period ? new Date(c.period) : null;
+          if (dueDate && dueDate < now) {
+            return acc.add(new Decimal(c.total_amount?.toString() || 0));
+          }
+          return acc;
+        }, new Decimal(0));
+
+        const rawOverdueDebt = overdueCharged.sub(netPaid);
+        const overdueDebt = Decimal.max(0, Decimal.min(debt, rawOverdueDebt));
 
         debtors.push({
           childId: child.id,
@@ -240,9 +285,6 @@ class AnalyticsService {
           debtAmount: debt.toNumber(),
           overdueDebtAmount: overdueDebt.toNumber(),
           chargesCount: child.charges.length,
-          lastPaymentDate: child.payments.length
-            ? child.payments[child.payments.length - 1].created_at
-            : null,
         });
 
         totalDebtAmount = totalDebtAmount.add(debt);
@@ -259,21 +301,23 @@ class AnalyticsService {
   }
 
   async getRevenueForecast() {
-    const activePricingPlan = await prisma.pricing_plans?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
-    }).catch(() => null);
+    let activeTariff = null;
+    try {
+      activeTariff = await prisma.tariffs.findFirst({
+        where: { code: 'TUITION_MONTHLY' },
+        orderBy: { valid_from: 'desc' },
+      });
+    } catch (e) {
+      console.error('[AnalyticsService] Error getting tariff for forecast:', e.message);
+    }
 
-    const activeMealRate = await prisma.meal_rates?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
-    }).catch(() => null);
-
-    const baseTuitionPrice = new Decimal(activePricingPlan?.price?.toString() || 15000);
-    const baseDailyMealFee = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
+    const baseTuitionPrice = new Decimal(activeTariff?.amount?.toString() || 15000);
+    const WORK_DAYS_PER_MONTH = 21;
 
     const children = await prisma.children.findMany({
-      include: {
+      select: {
+        id: true,
+        birth_date: true,
         discounts: true,
       },
     });
@@ -281,14 +325,18 @@ class AnalyticsService {
     let expectedTuitionRevenue = new Decimal(0);
     let expectedMealsRevenue = new Decimal(0);
 
-    const WORK_DAYS_PER_MONTH = 22;
-
     for (const child of children) {
-      const discountPct = child.discounts ? new Decimal(child.discounts.percentage?.toString() || 0) : new Decimal(0);
+      const discountPct = child.discounts
+        ? new Decimal(child.discounts.percentage?.toString() || 0)
+        : new Decimal(0);
+
       const discountMultiplier = new Decimal(1).sub(discountPct.div(100));
       const childTuition = baseTuitionPrice.mul(discountMultiplier);
       expectedTuitionRevenue = expectedTuitionRevenue.add(childTuition);
-      expectedMealsRevenue = expectedMealsRevenue.add(baseDailyMealFee.mul(WORK_DAYS_PER_MONTH));
+
+      const age = calculateAgeInYears(child.birth_date);
+      const dailyMealRate = await this.getMealRateByAge(age);
+      expectedMealsRevenue = expectedMealsRevenue.add(dailyMealRate.mul(WORK_DAYS_PER_MONTH));
     }
 
     const expectedTotalRevenue = expectedTuitionRevenue.add(expectedMealsRevenue);
@@ -306,8 +354,13 @@ class AnalyticsService {
     const targetChildrenPerGroup = (!isNaN(rawTarget) && rawTarget > 0) ? rawTarget : 12;
 
     const rawGroups = parseInt(scenarioParams.targetGroupsCount, 10);
-    const dbGroupsCount = await prisma.groups.count().catch(() => 1);
-    const targetGroupsCount = (!isNaN(rawGroups) && rawGroups > 0) ? rawGroups : (dbGroupsCount || 1);
+    let dbGroupsCount = 1;
+    try {
+      dbGroupsCount = await prisma.groups.count() || 1;
+    } catch (e) {
+      console.error('[AnalyticsService] Error counting groups:', e.message);
+    }
+    const targetGroupsCount = (!isNaN(rawGroups) && rawGroups > 0) ? rawGroups : dbGroupsCount;
 
     const rawTariffChange = parseFloat(scenarioParams.tariffPriceChangePercent);
     const tariffPriceChangePercent = !isNaN(rawTariffChange) ? rawTariffChange : 0;
@@ -315,18 +368,18 @@ class AnalyticsService {
     const rawDiscountChange = parseFloat(scenarioParams.discountChangePercent);
     const discountChangePercent = !isNaN(rawDiscountChange) ? rawDiscountChange : 0;
 
-    const activePricingPlan = await prisma.pricing_plans?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
-    }).catch(() => null);
+    let activeTariff = null;
+    try {
+      activeTariff = await prisma.tariffs.findFirst({
+        where: { code: 'TUITION_MONTHLY' },
+        orderBy: { valid_from: 'desc' },
+      });
+    } catch (e) {
+      console.error('[AnalyticsService] Error getting tariff for scenario:', e.message);
+    }
 
-    const activeMealRate = await prisma.meal_rates?.findFirst({
-      where: { is_active: true },
-      orderBy: { created_at: 'desc' },
-    }).catch(() => null);
-
-    const baseTuitionFromDb = new Decimal(activePricingPlan?.price?.toString() || 15000);
-    const baseMealFeeFromDb = new Decimal(activeMealRate?.daily_rate?.toString() || 400);
+    const baseTuitionFromDb = new Decimal(activeTariff?.amount?.toString() || 15000);
+    const baseMealFeeFromDb = new Decimal(400);
 
     const simulatedChildrenCount = targetChildrenPerGroup * targetGroupsCount;
 
@@ -336,12 +389,12 @@ class AnalyticsService {
     const baseTuitionPerChild = baseTuitionFromDb.mul(new Decimal(1).add(new Decimal(tariffPriceChangePercent).div(100)));
     const avgDiscount = new Decimal(0.1).add(new Decimal(discountChangePercent).div(100));
     const effectiveDiscount = Decimal.max(0, avgDiscount);
-    
+
     const simTuitionTotal = new Decimal(simulatedChildrenCount)
       .mul(baseTuitionPerChild)
       .mul(new Decimal(1).sub(effectiveDiscount));
-      
-    const simMealsTotal = new Decimal(simulatedChildrenCount).mul(baseMealFeeFromDb).mul(22);
+
+    const simMealsTotal = new Decimal(simulatedChildrenCount).mul(baseMealFeeFromDb).mul(21);
     const simulatedRevenue = simTuitionTotal.add(simMealsTotal);
 
     const N = targetChildrenPerGroup;
@@ -350,7 +403,7 @@ class AnalyticsService {
     const simulatedGroupSalaries = teacherSalaryPerGroup.add(assistantSalaryPerGroup).mul(targetGroupsCount);
 
     const simulatedRent = new Decimal(50000).mul(targetGroupsCount);
-    const adminFixedSalaries = new Decimal(120000); 
+    const adminFixedSalaries = new Decimal(120000);
     const simulatedExpenses = simulatedGroupSalaries.add(simulatedRent).add(adminFixedSalaries);
 
     const simulatedProfit = simulatedRevenue.sub(simulatedExpenses);
@@ -363,7 +416,7 @@ class AnalyticsService {
       .map((gCount) => {
         const totalKids = targetChildrenPerGroup * gCount;
         const tuition = new Decimal(totalKids).mul(baseTuitionPerChild).mul(new Decimal(1).sub(effectiveDiscount));
-        const meals = new Decimal(totalKids).mul(baseMealFeeFromDb).mul(22);
+        const meals = new Decimal(totalKids).mul(baseMealFeeFromDb).mul(21);
         const rev = tuition.add(meals);
         const salaries = teacherSalaryPerGroup.add(assistantSalaryPerGroup).mul(gCount);
         const rent = new Decimal(50000).mul(gCount);
@@ -405,13 +458,11 @@ class AnalyticsService {
   async getStaffOptimizationRecommendations() {
     let groups = [];
     try {
-      if (prisma.groups) {
-        groups = await prisma.groups.findMany({
-          include: { children: true },
-        });
-      }
+      groups = await prisma.groups.findMany({
+        include: { children: true },
+      });
     } catch (e) {
-      groups = [];
+      console.error('[AnalyticsService] Error getting groups for recommendations:', e.message);
     }
 
     const recommendations = groups.map((group) => {
@@ -421,16 +472,16 @@ class AnalyticsService {
 
       if (N === 0) {
         status = 'UNDERLOADED';
-        advice = 'Група порожня. Рекомендується об’єднати або призупинити утримання штатних одиниць.';
+        advice = 'Група порожня.';
       } else if (N < 12) {
         status = 'UNDERLOADED';
-        advice = `У групі ${N} дітей. Рекомендується докомплектувати групу до 12 дітей — це збільшить дохід без підвищеної надбавки вихователю за понаднормових дітей.`;
+        advice = `У групі ${N} дітей.`;
       } else if (N === 12) {
         status = 'OPTIMAL';
-        advice = 'Група має оптимальне заповнення (12 дітей). Зарплатне навантаження вихователя найбільш збалансоване.';
+        advice = 'Оптимальне заповнення.';
       } else {
         status = 'HIGH_LOAD';
-        advice = `У групі ${N} дітей (понаднормово). Додано змінні виплати вихователю. Якщо кількість дітей досягне 20+, рекомендовано сформувати додаткову групу.`;
+        advice = `У групі ${N} дітей.`;
       }
 
       return {

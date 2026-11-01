@@ -2,7 +2,7 @@ const service = require('./payments.service');
 
 async function create(req, res, next) {
   try {
-    const result = await service.createPayment(req.params.childId, req.body || {});
+    const result = await service.createPayment(req.params.childId, req.body || {}, req.user);
     return res.status(201).json(result);
   } catch (err) {
     next(err);

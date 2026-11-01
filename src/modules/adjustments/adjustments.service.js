@@ -61,25 +61,20 @@ async function createAdjustment(rawChildId, input, authorId) {
     throw new AppError(404, 'Нарахування не знайдено');
   }
 
-  if (direction === 'DECREASE') {
-    const existing = await repo.findManyByCharge(chargeId);
-    const effective = existing.reduce(
-      (sum, a) => (a.direction === 'INCREASE' ? sum.plus(a.amount) : sum.minus(a.amount)),
-      new Decimal(charge.total_amount)
-    );
-    if (amount.gt(effective)) {
-      throw new AppError(409, `Зменшення перевищує чинну суму нарахування (${effective.toFixed(2)})`);
-    }
-  }
-
   try {
-    const adjustment = await repo.create({
-      charge_id: chargeId,
+    const adjustment = await repo.createWithLimitCheck(
+      chargeId,
       direction,
-      amount: amount.toFixed(2),
-      reason,
-      created_by: authorId,
-    });
+      amount,
+      {
+        charge_id: chargeId,
+        direction,
+        amount: amount.toFixed(2),
+        reason,
+        created_by: authorId,
+      },
+      charge.total_amount
+    );
     return toAdjustmentDto(adjustment, childId);
   } catch (err) {
     if (err.code === 'P2003') throw new AppError(404, 'Нарахування не знайдено');

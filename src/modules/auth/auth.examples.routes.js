@@ -5,19 +5,15 @@ const { ROLES } = require('../../config/roles');
 
 const router = express.Router();
 
-// ПРИКЛАД 1: доступ для будь-якого залогіненого користувача.
-// Тут видно, як отримати поточного користувача.
 router.get('/whoami', authenticate, (req, res) => {
   const { id, email, role } = req.user;
   res.json({ userId: id, email, role });
 });
 
-// ПРИКЛАД 2: тільки одна роль (фінанси Dev 4 захищає так)
 router.get('/admin-only', authenticate, authorizeRoles(ROLES.ADMIN), (req, res) => {
   res.json({ message: 'Доступ тільки для ADMIN', userId: req.user.id });
 });
 
-// ПРИКЛАД 3: кілька дозволених ролей
 router.get(
   '/staff-only',
   authenticate,

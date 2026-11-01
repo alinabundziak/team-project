@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
 function findAll() {
-  return prisma.discounts.findMany({ orderBy: [{ percentage: 'asc' }, { id: 'asc' }] });
+  return prisma.discounts.findMany({ orderBy: [{ percent: 'asc' }, { id: 'asc' }] });
 }
 
 function findById(id) {
