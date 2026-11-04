@@ -27,7 +27,6 @@ async function authenticate(req, res, next) {
       throw new AppError(401, 'Користувача не знайдено');
     }
 
-    // це і є "спосіб отримання поточного userId/role" для інших Dev-ів
     req.user = { id: user.id, email: user.email, role: user.roles.name };
     next();
   } catch (err) {

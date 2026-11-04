@@ -26,17 +26,17 @@ function toChildDto(child) {
 function validateBirthDate(value) {
   const date = parseDateOnly(value);
   if (!date) {
-    throw new AppError(400, 'dateOfBirth РјР°С” Р±СѓС‚Рё РєРѕСЂРµРєС‚РЅРѕСЋ РґР°С‚РѕСЋ Сѓ С„РѕСЂРјР°С‚С– YYYY-MM-DD');
+    throw new AppError(400, 'dateOfBirth має бути коректною датою у форматі YYYY-MM-DD');
   }
   const today = todayUtc();
   if (date > today) {
-    throw new AppError(400, 'Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ РЅРµ РјРѕР¶Рµ Р±СѓС‚Рё РІ РјР°Р№Р±СѓС‚РЅСЊРѕРјСѓ');
+    throw new AppError(400, 'Дата народження не може бути в майбутньому');
   }
   const age = calculateAge(date, today);
   if (age < rules.MIN_AGE_YEARS || age > rules.MAX_AGE_YEARS) {
     throw new AppError(
       400,
-      `Р’С–Рє РґРёС‚РёРЅРё РјР°С” Р±СѓС‚Рё РІС–Рґ ${rules.MIN_AGE_YEARS} РґРѕ ${rules.MAX_AGE_YEARS} СЂРѕРєС–РІ (Р·Р°СЂР°Р·: ${age})`
+      `Вік дитини має бути від ${rules.MIN_AGE_YEARS} до ${rules.MAX_AGE_YEARS} років (зараз: ${age})`
     );
   }
   return date;
@@ -45,11 +45,11 @@ function validateBirthDate(value) {
 async function resolveGroupId(value) {
   if (value === null) return null;
   if (!Number.isInteger(value) || value < 1 || value > 2147483647) {
-    throw new AppError(400, 'groupId РјР°С” Р±СѓС‚Рё С†С–Р»РёРј РґРѕРґР°С‚РЅРёРј С‡РёСЃР»РѕРј Р°Р±Рѕ null');
+    throw new AppError(400, 'groupId має бути цілим додатним числом або null');
   }
   const group = await repo.findGroupById(value);
   if (!group) {
-    throw new AppError(404, 'Р“СЂСѓРїСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+    throw new AppError(404, 'Групу не знайдено');
   }
   return value;
 }
@@ -58,13 +58,13 @@ async function assertChildAgeMatchesGroup(groupId, birthDate) {
   const group = await repo.findGroupById(groupId);
 
   if (!group) {
-    throw new AppError(404, 'Р“СЂСѓРїСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+    throw new AppError(404, 'Групу не знайдено');
   }
 
   const childAge = calculateAge(birthDate);
 
   if (childAge !== group.target_age) {
-    throw new AppError(409, 'Р’С–Рє РґРёС‚РёРЅРё РЅРµ РІС–РґРїРѕРІС–РґР°С” РІС–РєСѓ РіСЂСѓРїРё');
+    throw new AppError(409, 'Вік дитини не відповідає віку групи');
   }
 }
 
@@ -77,7 +77,7 @@ async function listChildren(query = {}) {
   }
   if (query.search !== undefined) {
     if (typeof query.search !== 'string' || query.search.length > rules.MAX_NAME_LENGTH) {
-      throw new AppError(400, 'РќРµРєРѕСЂРµРєС‚РЅРёР№ РїР°СЂР°РјРµС‚СЂ search');
+      throw new AppError(400, 'Некоректний параметр search');
     }
     const s = query.search.trim();
     if (s) {

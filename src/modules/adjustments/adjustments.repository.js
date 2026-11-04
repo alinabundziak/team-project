@@ -3,21 +3,21 @@ const { Prisma } = require('@prisma/client');
 const Decimal = Prisma.Decimal;
 
 function create(data, tx = prisma) {
-  return tx.adjustment.create({ data });
+  return tx.adjustments.create({ data });
 }
 
 function findManyByCharge(chargeId, tx = prisma) {
-  return tx.adjustment.findMany({ where: { charge_id: chargeId } });
+  return tx.adjustments.findMany({ where: { charge_id: chargeId } });
 }
 
 function findManyByChild(childId, tx = prisma) {
-  return tx.adjustment.findMany({ where: { charge: { child_id: childId } } });
+  return tx.adjustments.findMany({ where: { charges: { child_id: childId } } });
 }
 
 async function sumByChild(childId, tx = prisma) {
-  const rows = await tx.adjustment.groupBy({
+  const rows = await tx.adjustments.groupBy({
     by: ['direction'],
-    where: { charge: { child_id: childId } },
+    where: { charges: { child_id: childId } },
     _sum: { amount: true },
   });
   const pick = (direction) => {
@@ -30,7 +30,7 @@ async function sumByChild(childId, tx = prisma) {
 async function createWithLimitCheck(chargeId, direction, amountDecimal, data, initialChargeTotal) {
   return await prisma.$transaction(async (tx) => {
     if (direction === 'DECREASE') {
-      const existing = await tx.adjustment.findMany({ where: { charge_id: chargeId } });
+      const existing = await tx.adjustments.findMany({ where: { charge_id: chargeId } });
       const effective = existing.reduce(
         (sum, a) => (a.direction === 'INCREASE' ? sum.plus(new Decimal(a.amount)) : sum.minus(new Decimal(a.amount))),
         new Decimal(initialChargeTotal)
@@ -42,7 +42,7 @@ async function createWithLimitCheck(chargeId, direction, amountDecimal, data, in
       }
     }
 
-    return await tx.adjustment.create({ data });
+    return await tx.adjustments.create({ data });
   });
 }
 

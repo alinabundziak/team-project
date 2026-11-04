@@ -2,10 +2,10 @@ require('dotenv').config();
 const prisma = require('../src/config/prisma');
 
 const DISCOUNTS = [
-  { name: 'Без знижки', percentage: 0 },
-  { name: 'Знижка 10%', percentage: 10 },
-  { name: 'Знижка 20%', percentage: 20 },
-  { name: 'Знижка 30%', percentage: 30 },
+  { code: 'NO_DISCOUNT', name: 'Без знижки', percentage: 0 },
+  { code: 'DISCOUNT_10', name: 'Знижка 10%', percentage: 10 },
+  { code: 'DISCOUNT_20', name: 'Знижка 20%', percentage: 20 },
+  { code: 'DISCOUNT_30', name: 'Знижка 30%', percentage: 30 },
 ];
 
 (async () => {
@@ -25,7 +25,7 @@ const DISCOUNTS = [
     for (const d of DISCOUNTS) {
       const exists = await prisma.discounts.findFirst({ where: { percentage: d.percentage } });
       if (exists) {
-        console.log(`Пропущено (вже є): ${d.percent}%`);
+        console.log(`Пропущено (вже є): ${d.percentage}%`);
         continue;
       }
       const created = await prisma.discounts.create({ data: d });
