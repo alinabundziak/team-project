@@ -30,7 +30,7 @@ model users {
   adjustments   adjustments[]
   employees     employees?
   parents       parents?
-  roles         roles?        @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  roles         roles?        @relation(fields: [role_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   first_name    String?       @db.VarChar(100)
   last_name     String?       @db.VarChar(100)
   phone         String?       @db.VarChar(50)
@@ -92,7 +92,7 @@ model children {
   group_id       Int?
   discount_id    Int?             @default(1)
   discounts      discounts?       @relation(fields: [discount_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups         groups?          @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  groups         groups?          @relation(fields: [group_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   charges        charges[]
   payments       payments[]
   subscriptions  subscriptions[]
@@ -121,8 +121,8 @@ model activities {
 model teacher_activities {
   employee_id Int
   activity_id Int
-  activities  activities @relation(fields: [activity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees   employees  @relation(fields: [employee_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  activities  activities @relation(fields: [activity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees   employees  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([employee_id, activity_id])
 }
@@ -136,10 +136,10 @@ model schedules {
   day_of_week Int
   start_time  DateTime    @db.Time(6)
   end_time    DateTime    @db.Time(6)
-  activities  activities? @relation(fields: [activity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  groups      groups?     @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  rooms       rooms?      @relation(fields: [room_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  employees   employees?  @relation(fields: [teacher_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  activities  activities? @relation(fields: [activity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  groups      groups?     @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms       rooms?      @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees   employees?  @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   created_at  DateTime?   @db.Timestamptz
 }
 
@@ -201,7 +201,7 @@ model payments {
   amount             Decimal?      @db.Decimal(10, 2)
   status             PaymentStatus @default(PENDING)
   created_at         DateTime?     @default(now()) @db.Timestamp(6)
-  children           children      @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  children           children      @relation(fields: [child_id], references: [id], onDelete: Restrict)
   refunds            refunds[]
 }
 
@@ -296,7 +296,7 @@ model child_parents {
   created_at DateTime? @default(now())
 
   child  children @relation(fields: [child_id], references: [id], onDelete: Cascade)
-  parent parents  @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+  parent parents  @relation(fields: [parent_id], references: [id], onDelete: Restrict)
 
   @@id([child_id, parent_id])
 }
