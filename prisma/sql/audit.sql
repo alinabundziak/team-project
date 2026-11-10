@@ -1,3 +1,10 @@
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'audit_owner') THEN
+        CREATE ROLE audit_owner;
+    END IF;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS public.audit_logs (
     id              SERIAL PRIMARY KEY,
@@ -7,13 +14,11 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     old_data        JSONB,
     new_data        JSONB,
     changed_columns JSONB NOT NULL,
-    db_user         VARCHAR(100) DEFAULT CURRENT_USER,
+    db_user         VARCHAR(100) DEFAULT SESSION_USER,
     changed_at      TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE public.audit_logs OWNER TO audit_owner;
-
-
 
 CREATE OR REPLACE FUNCTION public.audit_record_key(p_table text, p_row jsonb)
 RETURNS jsonb AS $$
@@ -57,9 +62,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ALTER FUNCTION public.audit_record_key(text, jsonb) OWNER TO audit_owner;
 REVOKE EXECUTE ON FUNCTION public.audit_record_key(text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.audit_record_key(text, jsonb) TO audit_owner;
-
-
+GRANT EXECUTE ON FUNCTION public.audit_record_key(text, jsonb) TO PUBLIC, postgres, authenticated, service_role, audit_owner;
 
 CREATE OR REPLACE FUNCTION public.audit_row_change()
 RETURNS trigger AS $$
@@ -113,9 +116,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ALTER FUNCTION public.audit_row_change() OWNER TO audit_owner;
 REVOKE EXECUTE ON FUNCTION public.audit_row_change() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.audit_row_change() TO PUBLIC, postgres, authenticated, service_role, audit_owner;
 
-
--- Функція 3: Фіксація операції TRUNCATE
 CREATE OR REPLACE FUNCTION public.audit_before_truncate()
 RETURNS trigger AS $$
 BEGIN
@@ -127,8 +129,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ALTER FUNCTION public.audit_before_truncate() OWNER TO audit_owner;
 REVOKE EXECUTE ON FUNCTION public.audit_before_truncate() FROM PUBLIC;
-
-
+GRANT EXECUTE ON FUNCTION public.audit_before_truncate() TO PUBLIC, postgres, authenticated, service_role, audit_owner;
 
 GRANT USAGE ON SCHEMA public TO audit_owner;
 
@@ -159,3 +160,34 @@ GRANT SELECT ON
     public.groups,
     public.children
 TO audit_owner;
+
+DO $$
+DECLARE
+    tbl text;
+    tbls text[] := ARRAY[
+        'discounts', 'activities', 'teacher_activities', 'schedules', 'staff_assignments',
+        'rules', 'charges', 'payments', 'refunds', 'tariffs',
+        'meal_rates', 'adjustments', 'subscriptions', 'child_benefits', 'meal_plans',
+        'pricing_plans', 'expenses', 'child_parents', 'roles', 'users',
+        'employees', 'parents', 'rooms', 'groups', 'children'
+    ];
+BEGIN
+    FOREACH tbl IN ARRAY tbls
+    LOOP
+        EXECUTE format('DROP TRIGGER IF EXISTS trg_audit_row_change ON public.%I;', tbl);
+        EXECUTE format('DROP TRIGGER IF EXISTS trg_audit_truncate ON public.%I;', tbl);
+
+        EXECUTE format('
+            CREATE TRIGGER trg_audit_row_change
+            AFTER INSERT OR UPDATE OR DELETE ON public.%I
+            FOR EACH ROW EXECUTE FUNCTION public.audit_row_change();
+        ', tbl);
+
+        EXECUTE format('
+            CREATE TRIGGER trg_audit_truncate
+            BEFORE TRUNCATE ON public.%I
+            FOR EACH STATEMENT EXECUTE FUNCTION public.audit_before_truncate();
+        ', tbl);
+    END LOOP;
+END
+$$;
