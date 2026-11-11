@@ -1,5 +1,18 @@
 const prisma = require('../../config/prisma');
 const Decimal = require('decimal.js');
+const childrenRepo = require('../children/children.repository');
+const { assertChildAccess } = require('../children/children.access');
+const discountsRepo = require('../discounts/discounts.repository');
+const { isSupportedPercent } = require('../discounts/discounts.service');
+const AppError = require('../../utils/AppError');
+const parseId = require('../../utils/parseId');
+const cfg = require('../../config/pricing');
+const { calculateTuition: calculateTuitionCalc } = require('./tuition.calculator');
+const pricingRepo = require('./pricing.repository');
+const { getTariffAmount } = require('../tariffs/tariffs.service');
+const { mealPriceForDays } = require('./meal.calculator');
+const {calculateAge, todayUtc, startOfMonthUtc, formatDateOnly} = require('../../utils/age');
+const PERIODS = ['MONTHLY', 'ANNUAL'];
 
 const MEAL_RATES_BY_AGE = {
     2: 300,
@@ -240,11 +253,16 @@ class PricingService {
             return await prisma.payments.findMany({
                 where: {
                     children: {
+<<<<<<< HEAD
                         child_parents: {
                             some: {
                                 parent_id: parent.id
                             }
                         }
+=======
+                        child_parents: { some: { parent_id: parent.id } }
+
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
                     }
                 },
                 include: { children: true }
@@ -356,6 +374,7 @@ class PricingService {
     }
 }
 
+<<<<<<< HEAD
 const childrenRepo = require('../children/children.repository');
 const discountsRepo = require('../discounts/discounts.repository');
 const { isSupportedPercent } = require('../discounts/discounts.service');
@@ -374,6 +393,8 @@ const {
 } = require('../../utils/age');
 
 const PERIODS = ['MONTHLY', 'ANNUAL'];
+=======
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
 
 function parsePeriod(value) {
     if (value === undefined) return 'MONTHLY';
@@ -417,7 +438,7 @@ async function resolveDiscount(child, overrideId) {
     return d;
 }
 
-async function estimateTuition(rawChildId, query = {}) {
+async function estimateTuition(rawChildId, query = {}, user) {
     const childId = parseId(rawChildId, 'childId');
     const period = parsePeriod(query.period);
 
@@ -425,7 +446,7 @@ async function estimateTuition(rawChildId, query = {}) {
         ? undefined
         : parseId(query.discountId, 'discountId');
 
-    const child = await childrenRepo.findById(childId);
+    const child = await assertChildAccess(user, childId);
 
     if (!child) {
         throw new AppError(404, 'Дитину не знайдено');
@@ -529,11 +550,11 @@ async function getChildDiscountPercent(child) {
     return percent;
 }
 
-async function estimateMeals(rawChildId, query = {}) {
+async function estimateMeals(rawChildId, query = {}, user) {
     const childId = parseId(rawChildId, 'childId');
     const days = parseDays(query.days);
 
-    const child = await childrenRepo.findById(childId);
+    const child = await assertChildAccess(user, childId);
 
     if (!child) {
         throw new AppError(404, 'Дитину не знайдено');

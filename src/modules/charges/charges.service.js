@@ -174,8 +174,13 @@ async function getFinancialHistory(rawChildId, user) {
     }),
     ...payments.map((p) => {
       const status = p.status || 'PAID';
+<<<<<<< HEAD
       const paidAmount = p.paid_amount !== undefined && p.paid_amount !== null 
         ? new Decimal(p.paid_amount).toFixed(2) 
+=======
+      const paidAmount = p.paid_amount !== undefined && p.paid_amount !== null
+        ? new Decimal(p.paid_amount).toFixed(2)
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
         : new Decimal(p.amount).toFixed(2);
 
       return {

@@ -19,7 +19,11 @@ async function assertChildAccess(user, childId) {
 
   if (userRole === ROLES.PARENT) {
     const ownParentId = await getOwnParentId(user.id);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
     if (ownParentId !== null) {
       const hasAccess = await repo.hasParentAccess(child.id, ownParentId);
       if (hasAccess) {

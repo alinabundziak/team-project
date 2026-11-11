@@ -1,4 +1,5 @@
 const prisma = require('../../config/prisma');
+const withParents = { child_parents: { select: { parent_id: true } } };
 
 const childSelect = {
   id: true,
@@ -23,7 +24,11 @@ function findMany({ where, skip, take }) {
     where,
     skip,
     take,
+<<<<<<< HEAD
     select: childSelect,
+=======
+    include: withParents,
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
     orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }, { id: 'asc' }],
   });
 }
@@ -33,6 +38,7 @@ function count(where) {
 }
 
 function findById(id) {
+<<<<<<< HEAD
   return prisma.children.findUnique({
     where: { id: Number(id) },
     select: childSelect,
@@ -52,6 +58,17 @@ function update(id, data) {
     data,
     select: childSelect,
   });
+=======
+  return prisma.children.findUnique({ where: { id: Number(id) }, include: withParents });
+}
+
+function create(data) {
+  return prisma.children.create({ data, include: withParents });
+}
+
+function update(id, data) {
+  return prisma.children.update({ where: { id: Number(id) }, data, include: withParents });
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
 }
 
 function remove(id) {
@@ -64,6 +81,7 @@ function findGroupById(id) {
 
 function countSubscriptions(childId) {
   return prisma.subscriptions.count({ where: { child_id: Number(childId) } });
+<<<<<<< HEAD
 }
 
 function findParentByUserId(userId) {
@@ -83,13 +101,31 @@ async function hasParentAccess(childId, parentId) {
     },
   });
   return Boolean(relation);
+=======
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
 }
 
 function countCharges(childId) {
   return prisma.charges.count({ where: { child_id: Number(childId) } });
 }
 
+function findParentByUserId(userId) {
+  return prisma.parents.findUnique({ where: { user_id: Number(userId) } });
+}
+
+async function hasParentAccess(childId, parentId) {
+  const relation = await prisma.child_parents.findUnique({
+    where: {
+      child_id_parent_id: {
+        child_id: Number(childId),
+        parent_id: Number(parentId),
+      },
+    },
+  });
+  return Boolean(relation);
+}
 module.exports = {
+  hasParentAccess,
   findMany,
   count,
   findById,
@@ -98,7 +134,11 @@ module.exports = {
   remove,
   findGroupById,
   countSubscriptions,
+<<<<<<< HEAD
   findParentByUserId,
   hasParentAccess,
+=======
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
   countCharges,
+  findParentByUserId,
 };

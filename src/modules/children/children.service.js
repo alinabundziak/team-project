@@ -6,8 +6,10 @@ const rules = require('../../config/childrenRules');
 const { validateName } = require('../../utils/validators');
 const { parsePagination } = require('../../utils/pagination');
 const { assertChildAccess, getOwnParentId } = require('./children.access');
+const { assertGroupHasCapacity } = require('../groups/groupCapacity.service');
+const { normalizeParentNote } = require('./children.validators');
 
-// Єдиний формат дитини назовні (контракт для Dev 2 і Dev 4)
+
 function toChildDto(child) {
   return {
     id: child.id,
@@ -16,7 +18,8 @@ function toChildDto(child) {
     dateOfBirth: formatDateOnly(child.birth_date),
     age: calculateAge(child.birth_date),
     groupId: child.group_id,
-    parentIds: child.parent_id ? [child.parent_id] : [],
+    parentIds: (child.child_parents || []).map((l) => l.parent_id).sort((a, b) => a - b),
+    parentNote: child.parent_note,
   };
 }
 
@@ -51,6 +54,20 @@ async function resolveGroupId(value) {
   return value;
 }
 
+async function assertChildAgeMatchesGroup(groupId, birthDate) {
+  const group = await repo.findGroupById(groupId);
+
+  if (!group) {
+    throw new AppError(404, 'Групу не знайдено');
+  }
+
+  const childAge = calculateAge(birthDate);
+
+  if (childAge !== group.target_age) {
+    throw new AppError(409, 'Вік дитини не відповідає віку групи');
+  }
+}
+
 async function listChildren(query = {}) {
   const { page, limit } = parsePagination(query);
 
@@ -82,11 +99,11 @@ async function listChildren(query = {}) {
 async function listMyChildren(user, query = {}) {
   const parentId = await getOwnParentId(user.id);
   if (parentId === null) {
-    throw new AppError(404, 'Профіль батька не знайдено');
+    throw new AppError(404, 'РџСЂРѕС„С–Р»СЊ Р±Р°С‚СЊРєР° РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
   }
 
   const { page, limit } = parsePagination(query);
-  const where = { parent_id: parentId };
+  const where = { child_parents: { some: { parent_id: parentId } } };
 
   const [items, total] = await Promise.all([
     repo.findMany({ where, skip: (page - 1) * limit, take: limit }),
@@ -104,11 +121,16 @@ async function getChild(rawId, user) {
 
 async function createChild(input) {
   const data = {
-    first_name: validateName(input.firstName, "Ім'я"),
-    last_name: validateName(input.lastName, 'Прізвище'),
+    first_name: validateName(input.firstName, "Р†Рј'СЏ"),
+    last_name: validateName(input.lastName, 'РџСЂС–Р·РІРёС‰Рµ'),
     birth_date: validateBirthDate(input.dateOfBirth),
     group_id: input.groupId === undefined ? null : await resolveGroupId(input.groupId),
   };
+
+  if (data.group_id !== null) {
+    await assertChildAgeMatchesGroup(data.group_id, data.birth_date);
+    await assertGroupHasCapacity(data.group_id);
+  }
 
   const child = await repo.create(data);
   return toChildDto(child);
@@ -118,24 +140,49 @@ async function updateChild(rawId, input) {
   const id = parseId(rawId);
 
   const data = {};
-  if (input.firstName !== undefined) data.first_name = validateName(input.firstName, "Ім'я");
-  if (input.lastName !== undefined) data.last_name = validateName(input.lastName, 'Прізвище');
+  if (input.firstName !== undefined) data.first_name = validateName(input.firstName, "Р†Рј'СЏ");
+  if (input.lastName !== undefined) data.last_name = validateName(input.lastName, 'РџСЂС–Р·РІРёС‰Рµ');
   if (input.dateOfBirth !== undefined) data.birth_date = validateBirthDate(input.dateOfBirth);
   if (input.groupId !== undefined) data.group_id = await resolveGroupId(input.groupId);
 
   if (Object.keys(data).length === 0) {
-    throw new AppError(400, 'Немає полів для оновлення');
+    throw new AppError(400, 'РќРµРјР°С” РїРѕР»С–РІ РґР»СЏ РѕРЅРѕРІР»РµРЅРЅСЏ');
   }
 
   const existing = await repo.findById(id);
-  if (!existing) throw new AppError(404, 'Дитину не знайдено');
+  if (!existing) throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+
+  const effectiveGroupId =
+    data.group_id !== undefined ? data.group_id : existing.group_id;
+
+  const effectiveBirthDate =
+    data.birth_date !== undefined ? data.birth_date : existing.birth_date;
+
+  if (
+    effectiveGroupId !== null &&
+    effectiveGroupId !== undefined &&
+    (data.group_id !== undefined || data.birth_date !== undefined)
+  ) {
+    await assertChildAgeMatchesGroup(
+      effectiveGroupId,
+      effectiveBirthDate
+    );
+  }
+
+  if (
+    data.group_id !== undefined &&
+    data.group_id !== null &&
+    data.group_id !== existing.group_id
+  ) {
+    await assertGroupHasCapacity(data.group_id, id);
+  }
 
   try {
     const child = await repo.update(id, data);
     return toChildDto(child);
   } catch (err) {
-    if (err.code === 'P2025') throw new AppError(404, 'Дитину не знайдено');
-    if (err.code === 'P2003') throw new AppError(404, 'Групу не знайдено');
+    if (err.code === 'P2025') throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+    if (err.code === 'P2003') throw new AppError(404, 'Р“СЂСѓРїСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
     throw err;
   }
 }
@@ -144,19 +191,34 @@ async function deleteChild(rawId) {
   const id = parseId(rawId);
 
   const existing = await repo.findById(id);
-  if (!existing) throw new AppError(404, 'Дитину не знайдено');
+  if (!existing) throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
 
     if ((await repo.countSubscriptions(id)) > 0 || (await repo.countCharges(id)) > 0) {
-    throw new AppError(409, 'Неможливо видалити дитину: є пов\'язані підписки/нарахування');
+    throw new AppError(409, 'РќРµРјРѕР¶Р»РёРІРѕ РІРёРґР°Р»РёС‚Рё РґРёС‚РёРЅСѓ: С” РїРѕРІ\'СЏР·Р°РЅС– РїС–РґРїРёСЃРєРё/РЅР°СЂР°С…СѓРІР°РЅРЅСЏ');
   }
 
   try {
     await repo.remove(id);
   } catch (err) {
-    if (err.code === 'P2025') throw new AppError(404, 'Дитину не знайдено');
-    if (err.code === 'P2003') throw new AppError(409, 'Неможливо видалити дитину: є пов\'язані фінансові записи');
+    if (err.code === 'P2025') throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+    if (err.code === 'P2003') throw new AppError(409, 'РќРµРјРѕР¶Р»РёРІРѕ РІРёРґР°Р»РёС‚Рё РґРёС‚РёРЅСѓ: С” РїРѕРІ\'СЏР·Р°РЅС– С„С–РЅР°РЅСЃРѕРІС– Р·Р°РїРёСЃРё');
     throw err;
   }
 }
 
-module.exports = { listChildren, listMyChildren, getChild, createChild, updateChild, deleteChild, toChildDto };
+async function updateParentNote(rawId, input, user) {
+  const id = parseId(rawId);
+  const note = normalizeParentNote(input.parentNote);
+
+  await assertChildAccess(user, id);
+
+  try {
+    const child = await repo.update(id, { parent_note: note });
+    return toChildDto(child);
+  } catch (err) {
+    if (err.code === 'P2025') throw new AppError(404, 'Р”РёС‚РёРЅСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ');
+    throw err;
+  }
+}
+
+module.exports = { listChildren, listMyChildren, getChild, createChild, updateChild, deleteChild, toChildDto, updateParentNote};

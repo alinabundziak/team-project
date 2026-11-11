@@ -11,7 +11,7 @@ const INITIAL_VALID_FROM = new Date(Date.UTC(2026, 8, 1)); // 2026-09-01
     for (let age = cfg.MEAL_MIN_AGE; age <= cfg.MEAL_MAX_AGE; age++) {
       const rate = dailyRateByFormula(age);
       const exists = await prisma.meal_rates.findUnique({
-        where: { age_valid_from: { age, valid_from: INITIAL_VALID_FROM } },
+        where: { age },
       });
 
       if (!exists) {

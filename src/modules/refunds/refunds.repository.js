@@ -15,15 +15,24 @@ async function sumByPayment(paymentId, tx = prisma) {
 
 async function sumByChild(childId, tx = prisma) {
   const res = await tx.refunds.aggregate({
+<<<<<<< HEAD
     where: { payments: { child_id: childId } }, 
+=======
+    where: { payments: { child_id: childId } },
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
     _sum: { amount: true },
   });
   return res._sum.amount ?? 0;
 }
 
 function findManyByChild(childId, tx = prisma) {
+<<<<<<< HEAD
   return tx.refunds.findMany({ 
     where: { payments: { child_id: childId } } 
+=======
+  return tx.refunds.findMany({
+    where: { payments: { child_id: childId } }
+>>>>>>> 02bfe715c157cced389f2f4c1c726deb6a5e4c65
   });
 }
 
