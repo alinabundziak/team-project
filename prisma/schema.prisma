@@ -310,7 +310,7 @@ model audit_logs {
   old_data        Json?    @db.JsonB
   new_data        Json?    @db.JsonB
   changed_columns Json     @db.JsonB
-  db_user         String?  @db.VarChar(100)
+  db_user         String?  @default(dbgenerated("SESSION_USER")) @db.VarChar(100)
   changed_at      DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([table_name, changed_at])
