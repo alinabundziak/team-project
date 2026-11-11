@@ -6,14 +6,6 @@ BEGIN
 END
 $$;
 
-GRANT audit_owner TO postgres;
-DO $$
-BEGIN
-    EXECUTE format('GRANT audit_owner TO %I', CURRENT_USER);
-EXCEPTION WHEN OTHERS THEN
-    NULL;
-END $$;
-
 CREATE TABLE IF NOT EXISTS public.audit_logs (
     id              SERIAL PRIMARY KEY,
     table_name      VARCHAR(100) NOT NULL,
@@ -39,10 +31,11 @@ SET old_data = CASE WHEN old_data IS NOT NULL THEN old_data - 'password_hash' EL
     new_data = CASE WHEN new_data IS NOT NULL THEN new_data - 'password_hash' ELSE NULL END
 WHERE (old_data ? 'password_hash') OR (new_data ? 'password_hash');
 
-ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.audit_logs
+FROM PUBLIC, anon, authenticated, service_role;
 
-REVOKE ALL PRIVILEGES ON TABLE public.audit_logs FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.audit_logs TO service_role;
+GRANT ALL ON TABLE public.audit_logs TO audit_owner, postgres;
 
 DROP POLICY IF EXISTS audit_logs_select_policy ON public.audit_logs;
 DROP POLICY IF EXISTS audit_logs_admin_select_policy ON public.audit_logs;
@@ -51,28 +44,24 @@ CREATE POLICY audit_logs_select_policy ON public.audit_logs
     TO service_role, audit_owner, postgres
     USING (true);
 
-GRANT ALL ON TABLE public.audit_logs TO audit_owner, postgres;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO audit_owner, postgres;
+GRANT USAGE, SELECT, UPDATE ON SEQUENCE public.audit_logs_id_seq TO audit_owner;
 
-DO $$
-DECLARE
-    tbl text;
-    tbls text[] := ARRAY[
-        'discounts', 'activities', 'teacher_activities', 'schedules', 'staff_assignments',
-        'rules', 'charges', 'payments', 'refunds', 'tariffs',
-        'meal_rates', 'adjustments', 'subscriptions', 'child_benefits', 'meal_plans',
-        'pricing_plans', 'expenses', 'child_parents', 'roles', 'users',
-        'employees', 'parents', 'rooms', 'groups', 'children'
-    ];
-BEGIN
-    FOREACH tbl IN ARRAY tbls
-    LOOP
-        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl);
-        EXECUTE format('DROP POLICY IF EXISTS bypass_rls_for_audit_owner ON public.%I;', tbl);
-        EXECUTE format('CREATE POLICY bypass_rls_for_audit_owner ON public.%I FOR ALL TO audit_owner USING (true) WITH CHECK (true);', tbl);
-    END LOOP;
-END
-$$;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tariffs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_activities ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS audit_owner_read_users ON public.users;
+CREATE POLICY audit_owner_read_users ON public.users
+    FOR SELECT TO audit_owner USING (true);
+
+DROP POLICY IF EXISTS audit_owner_read_tariffs ON public.tariffs;
+CREATE POLICY audit_owner_read_tariffs ON public.tariffs
+    FOR SELECT TO audit_owner USING (true);
+
+DROP POLICY IF EXISTS audit_owner_read_teacher_activities ON public.teacher_activities;
+CREATE POLICY audit_owner_read_teacher_activities ON public.teacher_activities
+    FOR SELECT TO audit_owner USING (true);
 
 CREATE OR REPLACE FUNCTION public.audit_record_key(p_table text, p_row jsonb)
 RETURNS jsonb
@@ -124,8 +113,11 @@ END;
 $$;
 
 ALTER FUNCTION public.audit_record_key(text, jsonb) OWNER TO audit_owner;
-REVOKE EXECUTE ON FUNCTION public.audit_record_key(text, jsonb) FROM PUBLIC, authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.audit_record_key(text, jsonb) TO audit_owner, postgres, service_role;
+REVOKE EXECUTE ON FUNCTION public.audit_record_key(text, jsonb)
+FROM PUBLIC, authenticated, anon, service_role;
+
+GRANT EXECUTE ON FUNCTION public.audit_record_key(text, jsonb)
+TO audit_owner, postgres;
 
 CREATE OR REPLACE FUNCTION public.audit_row_change()
 RETURNS trigger
@@ -147,7 +139,6 @@ BEGIN
         v_op := 'INSERT';
         v_new_data := to_jsonb(NEW);
         v_record_key := public.audit_record_key(TG_TABLE_NAME, v_new_data);
-        v_changed_cols := '[]'::jsonb;
         
         v_new_data := v_new_data - 'password_hash';
 
@@ -192,8 +183,8 @@ END;
 $$;
 
 ALTER FUNCTION public.audit_row_change() OWNER TO audit_owner;
-REVOKE EXECUTE ON FUNCTION public.audit_row_change() FROM PUBLIC, authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.audit_row_change() TO audit_owner, postgres, service_role;
+REVOKE EXECUTE ON FUNCTION public.audit_row_change() FROM PUBLIC, authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.audit_row_change() TO audit_owner, postgres;
 
 CREATE OR REPLACE FUNCTION public.audit_before_truncate()
 RETURNS trigger
@@ -226,8 +217,8 @@ END;
 $$;
 
 ALTER FUNCTION public.audit_before_truncate() OWNER TO audit_owner;
-REVOKE EXECUTE ON FUNCTION public.audit_before_truncate() FROM PUBLIC, authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.audit_before_truncate() TO audit_owner, postgres, service_role;
+REVOKE EXECUTE ON FUNCTION public.audit_before_truncate() FROM PUBLIC, authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.audit_before_truncate() TO audit_owner, postgres;
 
 GRANT USAGE ON SCHEMA public TO audit_owner;
 
