@@ -1,5 +1,7 @@
 const express = require("express");
 
+
+const auditRoutes = require("./modules/audit/audit.routes");
 const childrenRoutes = require("./modules/children/children.routes");
 const pricingRoutes = require("./modules/pricing/pricing.routes");
 const analyticsRouter = require("./modules/analytics/analytics.routes");
@@ -56,6 +58,8 @@ if (process.env.NODE_ENV !== "production") {
   );
 }
 
+
+app.use("/api/audit-logs", auditRoutes);
 app.use(errorHandler.notFound);
 app.use(errorHandler);
 
