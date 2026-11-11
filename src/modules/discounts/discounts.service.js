@@ -15,7 +15,7 @@ function toDiscountDto(d) {
     id: d.id,
     code: d.code || null,
     name: d.description || (d.code ? d.code : `Знижка ${d.percentage}%`),
-    percentage: new Decimal(d.percentage).toNumber(),
+    percent: new Decimal(d.percentage).toNumber(),
   };
 }
 
