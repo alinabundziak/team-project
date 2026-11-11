@@ -6,7 +6,7 @@ BEGIN
 END
 $$;
 
-GRANT audit_owner TO postgres, service_role;
+GRANT audit_owner TO postgres;
 DO $$
 BEGIN
     EXECUTE format('GRANT audit_owner TO %I', CURRENT_USER);
@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     changed_at      TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS audit_logs_table_name_changed_at_idx ON public.audit_logs (table_name, changed_at);
+CREATE INDEX IF NOT EXISTS audit_logs_changed_at_idx ON public.audit_logs (changed_at);
+CREATE INDEX IF NOT EXISTS audit_logs_operation_changed_at_idx ON public.audit_logs (operation, changed_at);
+
 ALTER TABLE public.audit_logs OWNER TO audit_owner;
 ALTER SEQUENCE public.audit_logs_id_seq OWNER TO audit_owner;
 ALTER TABLE public.audit_logs ALTER COLUMN db_user SET DEFAULT SESSION_USER;
@@ -37,17 +41,38 @@ WHERE (old_data ? 'password_hash') OR (new_data ? 'password_hash');
 
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.audit_logs FROM PUBLIC, authenticated, anon;
-GRANT SELECT ON TABLE public.audit_logs TO PUBLIC, authenticated, anon;
+REVOKE ALL PRIVILEGES ON TABLE public.audit_logs FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.audit_logs TO service_role;
 
 DROP POLICY IF EXISTS audit_logs_select_policy ON public.audit_logs;
+DROP POLICY IF EXISTS audit_logs_admin_select_policy ON public.audit_logs;
 CREATE POLICY audit_logs_select_policy ON public.audit_logs
     FOR SELECT
-    TO authenticated, service_role, audit_owner
+    TO service_role, audit_owner, postgres
     USING (true);
 
-GRANT ALL ON TABLE public.audit_logs TO audit_owner, postgres, service_role;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO audit_owner, postgres, service_role;
+GRANT ALL ON TABLE public.audit_logs TO audit_owner, postgres;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO audit_owner, postgres;
+
+DO $$
+DECLARE
+    tbl text;
+    tbls text[] := ARRAY[
+        'discounts', 'activities', 'teacher_activities', 'schedules', 'staff_assignments',
+        'rules', 'charges', 'payments', 'refunds', 'tariffs',
+        'meal_rates', 'adjustments', 'subscriptions', 'child_benefits', 'meal_plans',
+        'pricing_plans', 'expenses', 'child_parents', 'roles', 'users',
+        'employees', 'parents', 'rooms', 'groups', 'children'
+    ];
+BEGIN
+    FOREACH tbl IN ARRAY tbls
+    LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl);
+        EXECUTE format('DROP POLICY IF EXISTS bypass_rls_for_audit_owner ON public.%I;', tbl);
+        EXECUTE format('CREATE POLICY bypass_rls_for_audit_owner ON public.%I FOR ALL TO audit_owner USING (true) WITH CHECK (true);', tbl);
+    END LOOP;
+END
+$$;
 
 CREATE OR REPLACE FUNCTION public.audit_record_key(p_table text, p_row jsonb)
 RETURNS jsonb
@@ -116,7 +141,7 @@ DECLARE
     v_op varchar(10);
     v_full_table_name text;
 BEGIN
-    v_full_table_name := TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME;
+    v_full_table_name := 'public.' || TG_TABLE_NAME;
 
     IF (TG_OP = 'INSERT') THEN
         v_op := 'INSERT';
@@ -184,7 +209,7 @@ DECLARE
     v_query text;
     v_full_table_name text;
 BEGIN
-    v_full_table_name := TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME;
+    v_full_table_name := 'public.' || TG_TABLE_NAME;
     v_query := format('SELECT * FROM public.%I', TG_TABLE_NAME);
 
     FOR v_row IN EXECUTE v_query LOOP
