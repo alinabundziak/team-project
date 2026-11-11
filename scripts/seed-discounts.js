@@ -25,11 +25,11 @@ const DISCOUNTS = [
     for (const d of DISCOUNTS) {
       const exists = await prisma.discounts.findFirst({ where: { percentage: d.percentage } });
       if (exists) {
-        console.log(`Пропущено (вже є): ${d.percentageage}%`);
+        console.log(`Пропущено (вже є): ${d.percentage}%`);
         continue;
       }
       const created = await prisma.discounts.create({ data: d });
-      console.log(`Створено: id=${created.id}, ${d.percentageage}%`);
+      console.log(`Створено: id=${created.id}, ${d.percentage}%`);
     }
   } catch (err) {
     console.error('Помилка:', err.message);
