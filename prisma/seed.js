@@ -6,22 +6,22 @@ const DISCOUNTS = [
     {
         code: "NO_DISCOUNT",
         description: "Без знижки",
-        percent: 0
+        percentage: 0
     },
     {
         code: "DISCOUNT_10",
         description: "Знижка 10%",
-        percent: 10
+        percentage: 10
     },
     {
         code: "DISCOUNT_20",
         description: "Знижка 20%",
-        percent: 20
+        percentage: 20
     },
     {
         code: "DISCOUNT_30",
         description: "Знижка 30%",
-        percent: 30
+        percentage: 30
     }
 ];
 
@@ -52,7 +52,7 @@ async function main() {
 
         const noDiscountRows = await prisma.discounts.findMany({
             where: { code: "NO_DISCOUNT" },
-            select: { id: true, percent: true }
+            select: { id: true, percentage: true }
         });
 
         if (noDiscountRows.length > 1) {
@@ -62,7 +62,7 @@ async function main() {
         if (noDiscountRows.length === 1) {
             const row = noDiscountRows[0];
 
-            if (row.id !== 1 || Number(row.percent) !== 0) {
+            if (row.id !== 1 || Number(row.percentage) !== 0) {
                 throw new Error(
                     "NO_DISCOUNT має бути записом з id=1 і percent=0."
                 );
@@ -95,7 +95,7 @@ async function main() {
         for (const discount of DISCOUNTS.slice(1)) {
             const existingRows = await prisma.discounts.findMany({
                 where: { code: discount.code },
-                select: { id: true, percent: true }
+                select: { id: true, percentage: true }
             });
 
             if (existingRows.length > 1) {
@@ -105,7 +105,7 @@ async function main() {
             }
 
             if (existingRows.length === 1) {
-                if (Number(existingRows[0].percent) !== discount.percent) {
+                if (Number(existingRows[0].percentage) !== discount.percentage) {
                     throw new Error(
                         `Знижка ${discount.code} має неочікуваний відсоток.`
                     );

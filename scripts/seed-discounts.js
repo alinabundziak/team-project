@@ -13,7 +13,7 @@ const DISCOUNTS = [
     const existing = await prisma.discounts.findMany({ orderBy: { id: 'asc' } });
     console.log(
       'Зараз у таблиці:',
-      existing.map((d) => `id=${d.id} (${d.percent}%)`).join(', ') || 'порожньо'
+      existing.map((d) => `id=${d.id} (${d.percentage}%)`).join(', ') || 'порожньо'
     );
 
     if (existing.length > 0) {
