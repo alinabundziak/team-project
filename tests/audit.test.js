@@ -1,3 +1,4 @@
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const proxyquire = require("proxyquire").noCallThru();
@@ -127,9 +128,7 @@ test("відхиляє некоректний формат дати", async () =
   const service = loadAuditService();
 
   await assert.rejects(
-    () => service.listAuditLogs({
-      from: "10-11-2026",
-    }),
+    () => service.listAuditLogs({ from: "10-11-2026" }),
     (error) => {
       assert.equal(error.status, 400);
       return true;
@@ -220,6 +219,27 @@ test("правильно перетворює запис аудиту в DTO", a
     limit: 20,
     total: 1,
   });
+});
+
+test("залишає oldData та newData рівними null у DTO", async () => {
+  const auditRecord = {
+    id: 2,
+    table_name: "public.children",
+    record_key: { child_id: 5 },
+    operation: "INSERT",
+    old_data: null,
+    new_data: null,
+    changed_columns: [],
+    db_user: "postgres",
+    changed_at: new Date("2026-11-05T12:00:00.000Z"),
+  };
+
+  const service = loadAuditService([auditRecord], 1);
+
+  const result = await service.listAuditLogs({});
+
+  assert.equal(result.data[0].oldData, null);
+  assert.equal(result.data[0].newData, null);
 });
 
 test("правильно формує фільтр за діапазоном дат", async () => {
@@ -372,14 +392,32 @@ test("підтримує одночасне використання кільк�
   assert.equal(receivedOptions.take, 5);
 });
 
-test("підтримує всі дозволені операції аудиту", async () => {
-  const service = loadAuditService();
+test("передає кожну дозволену операцію в where.operation", async () => {
+  const operations = ["INSERT", "UPDATE", "DELETE", "TRUNCATE"];
 
-  for (const operation of ["INSERT", "UPDATE", "DELETE", "TRUNCATE"]) {
-    const result = await service.listAuditLogs({ operation });
+  for (const operation of operations) {
+    let receivedOptions;
 
-    assert.deepEqual(result.data, []);
-    assert.equal(result.meta.total, 0);
+    const repository = {
+      findMany: async (options) => {
+        receivedOptions = options;
+        return [];
+      },
+      count: async () => 0,
+    };
+
+    const service = proxyquire("../src/modules/audit/audit.service.js", {
+      "./audit.repository": repository,
+    });
+
+    await service.listAuditLogs({ operation });
+
+    assert.ok(receivedOptions, "Repository.findMany має бути викликаний");
+    assert.equal(
+      receivedOptions.where.operation,
+      operation,
+      `Операція ${operation} має передаватися в where.operation`
+    );
   }
 });
 

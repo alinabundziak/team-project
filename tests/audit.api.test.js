@@ -22,23 +22,30 @@ function testAuthenticate(req, res, next) {
 }
 
 function createApp() {
+  const repository = {
+    findMany: async () => [],
+    count: async () => 0,
+  };
+
+  const auditService = proxyquire(
+    "../src/modules/audit/audit.service.js",
+    {
+      "./audit.repository": repository,
+    }
+  );
+
+  const auditController = proxyquire(
+    "../src/modules/audit/audit.controller.js",
+    {
+      "./audit.service": auditService,
+    }
+  );
+
   const auditRoutes = proxyquire(
     "../src/modules/audit/audit.routes.js",
     {
       "../../middleware/authenticate": testAuthenticate,
-      "./audit.controller": {
-        list: (req, res) => {
-          res.status(200).json({
-            data: [],
-            meta: {
-              page: 1,
-              limit: 20,
-              total: 0,
-            },
-            receivedQuery: req.query,
-          });
-        },
-      },
+      "./audit.controller": auditController,
     }
   );
 
@@ -58,7 +65,7 @@ function createApp() {
 
 const app = createApp();
 
-test("ADMIN отримує список журналу аудиту", async () => {
+test("ADMIN отримує список журналу аудиту через реальний контролер і сервіс", async () => {
   const response = await request(app)
     .get("/api/audit-logs")
     .set("Authorization", "Bearer admin");
@@ -117,13 +124,10 @@ test("маршрут приймає коректні параметри філь
     .set("Authorization", "Bearer admin");
 
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.receivedQuery, {
-    tableName: "public.children",
-    operation: "UPDATE",
-    from: "2026-11-01",
-    to: "2026-11-05",
-    page: "2",
-    limit: "10",
+  assert.deepEqual(response.body.meta, {
+    page: 2,
+    limit: 10,
+    total: 0,
   });
 });
 
@@ -157,10 +161,37 @@ test("дата from пізніше за to повертає 400", async () => {
   assert.equal(response.status, 400);
 });
 
+test("неіснуюча календарна дата повертає 400", async () => {
+  const response = await request(app)
+    .get("/api/audit-logs")
+    .query({ from: "2026-02-30" })
+    .set("Authorization", "Bearer admin");
+
+  assert.equal(response.status, 400);
+});
+
 test("limit більший за 100 повертає 400", async () => {
   const response = await request(app)
     .get("/api/audit-logs")
     .query({ limit: 101 })
+    .set("Authorization", "Bearer admin");
+
+  assert.equal(response.status, 400);
+});
+
+test("нульовий page повертає 400", async () => {
+  const response = await request(app)
+    .get("/api/audit-logs")
+    .query({ page: 0 })
+    .set("Authorization", "Bearer admin");
+
+  assert.equal(response.status, 400);
+});
+
+test("нульовий limit повертає 400", async () => {
+  const response = await request(app)
+    .get("/api/audit-logs")
+    .query({ limit: 0 })
     .set("Authorization", "Bearer admin");
 
   assert.equal(response.status, 400);
