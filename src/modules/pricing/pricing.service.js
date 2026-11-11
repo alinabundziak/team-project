@@ -189,7 +189,7 @@ class PricingService {
             period: selectedPeriod
         });
 
-        const birthDate = new Date(child.date_of_birth || child.birth_date);
+        const birthDate = new Date(child.birth_date);
         const age = calculateAge(birthDate);
 
         const dbMealRate = await prisma.meal_rates.findUnique({

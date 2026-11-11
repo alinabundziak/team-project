@@ -66,15 +66,21 @@ router.get('/schedules', asyncHandler(async (req, res) => {
     const parentRecord = await prisma.parents.findUnique({
       where: { user_id: userId },
       include: {
-        children: true
+        child_parents: {
+          select: {
+            child: {
+              select: { group_id: true },
+            },
+          },
+        },
       }
     });
 
     if (!parentRecord) return res.status(404).json({ error: 'Профіль батьків не знайдено' });
 
-    const groupIds = parentRecord.children
-      .map(child => child.group_id)
-      .filter(id => id != null);
+    const groupIds = parentRecord.child_parents
+      .map((link) => link.child.group_id)
+      .filter((id) => id != null);
 
     const schedules = await prisma.schedules.findMany({
       where: { group_id: { in: groupIds } },
