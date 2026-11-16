@@ -380,12 +380,12 @@ class AnalyticsService {
           { valid_from: 'desc' },
         ],
       });
+        if (!mealRate) {
+          throw new Error(
+            `Не знайдено тариф харчування для дитини ${child.id} (вік: ${age})`
+          );
+        }
 
-      if (!mealRate) {
-        throw new Error(
-          `РќРµ Р·РЅР°Р№РґРµРЅРѕ С‚Р°СЂРёС„ С…Р°СЂС‡СѓРІР°РЅРЅСЏ РґР»СЏ РґРёС‚РёРЅРё ${child.id} (РІС–Рє: ${age})`
-        );
-      }
 
       const dailyMealRate = new Decimal(
         mealRate.daily_rate.toString()
@@ -548,8 +548,8 @@ class AnalyticsService {
 
       if (!rate) {
         throw new Error(
-          `РќРµ Р·РЅР°Р№РґРµРЅРѕ С‚Р°СЂРёС„ С…Р°СЂС‡СѓРІР°РЅРЅСЏ РґР»СЏ РґРёС‚РёРЅРё ${child.id}`,
-        );
+  `Не знайдено тариф харчування для дитини ${child.id} (вік: ${age})`
+);
       }
 
       const dailyRate = new Decimal(rate.daily_rate.toString());
