@@ -1,43 +1,160 @@
+
 const prisma = require('../config/prisma');
 
-function isValidTimeFormat(timeStr) {
-  if (typeof timeStr !== 'string') return false;
-  const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-  return timeRegex.test(timeStr);
-}
-
-function timeToMinutes(timeStr) {
-  if (!isValidTimeFormat(timeStr)) return NaN;
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function minutesToTime(mins) {
-  const h = String(Math.floor(mins / 60)).padStart(2, '0');
-  const m = String(mins % 60).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-function minutesToDate(mins) {
-  return new Date(Date.UTC(1970, 0, 1, Math.floor(mins / 60), mins % 60, 0, 0));
-}
-
-const DAY_START = timeToMinutes('09:00');
-const DAY_END = timeToMinutes('17:00');
+const DAY_START = 9 * 60;
+const DAY_END = 17 * 60;
+const SLOT_STEP = 15;
 
 const RESERVED_SLOTS = [
-  { name: 'Сніданок', start: timeToMinutes('09:00'), end: timeToMinutes('09:30') },
-  { name: 'Обід', start: timeToMinutes('12:00'), end: timeToMinutes('12:30') },
-  { name: 'Сон', start: timeToMinutes('13:00'), end: timeToMinutes('14:00') },
-  { name: 'Полуденок/Вечеря', start: timeToMinutes('15:30'), end: timeToMinutes('16:00') }
+  { name: 'Сніданок', start: 9 * 60, end: 9 * 60 + 30 },
+  { name: 'Обід', start: 12 * 60, end: 12 * 60 + 30 },
+  { name: 'Сон', start: 13 * 60, end: 14 * 60 },
+  { name: 'Полуденок/Вечеря', start: 15 * 60 + 30, end: 16 * 60 },
 ];
+
+function isValidTimeFormat(value) {
+  return typeof value === 'string' &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function timeToMinutes(value) {
+  if (!isValidTimeFormat(value)) return NaN;
+
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes) {
+  const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
+  const mins = String(minutes % 60).padStart(2, '0');
+
+  return `${hours}:${mins}`;
+}
+
+function minutesToDate(minutes) {
+  return new Date(
+    Date.UTC(1970, 0, 1, Math.floor(minutes / 60), minutes % 60)
+  );
+}
+
+function dateToMinutes(value) {
+  if (value instanceof Date) {
+    return value.getUTCHours() * 60 + value.getUTCMinutes();
+  }
+
+  if (typeof value === 'string') {
+    return timeToMinutes(value);
+  }
+
+  return NaN;
+}
 
 function isOverlapping(startA, endA, startB, endB) {
   return startA < endB && endA > startB;
 }
 
 function isReservedSlot(start, end) {
-  return RESERVED_SLOTS.some(slot => isOverlapping(start, end, slot.start, slot.end));
+  return RESERVED_SLOTS.some(slot =>
+    isOverlapping(start, end, slot.start, slot.end)
+  );
+}
+
+function isPositiveInteger(value) {
+  return (
+    (typeof value === 'number' ||
+      (typeof value === 'string' && value.trim() !== '')) &&
+    Number.isSafeInteger(Number(value)) &&
+    Number(value) > 0
+  );
+}
+
+function getScheduleConflicts(item, existingSchedules) {
+  const start = dateToMinutes(item.start_time);
+  const end = dateToMinutes(item.end_time);
+
+  for (const schedule of existingSchedules) {
+    if (Number(schedule.day_of_week) !== Number(item.day_of_week)) {
+      continue;
+    }
+
+    const existingStart = dateToMinutes(schedule.start_time);
+    const existingEnd = dateToMinutes(schedule.end_time);
+
+    if (
+      !Number.isFinite(existingStart) ||
+      !Number.isFinite(existingEnd) ||
+      !isOverlapping(start, end, existingStart, existingEnd)
+    ) {
+      continue;
+    }
+
+    if (Number(schedule.teacher_id) === Number(item.teacher_id)) {
+      return 'Викладач уже має заняття у цей час';
+    }
+
+    if (Number(schedule.room_id) === Number(item.room_id)) {
+      return 'Кімната вже зайнята у цей час';
+    }
+
+    if (
+      item.sourceGroupId != null &&
+      Number(schedule.group_id) === Number(item.sourceGroupId)
+    ) {
+      return 'Група вже має заняття у цей час';
+    }
+  }
+
+  return null;
+}
+
+function getDraftConflicts(item, draft) {
+  const start = dateToMinutes(item.start_time);
+  const end = dateToMinutes(item.end_time);
+
+  for (const scheduled of draft) {
+    if (
+      Number(scheduled.day_of_week) !== Number(item.day_of_week)
+    ) {
+      continue;
+    }
+
+    const scheduledStart = dateToMinutes(scheduled.start_time);
+    const scheduledEnd = dateToMinutes(scheduled.end_time);
+
+    if (
+      !Number.isFinite(scheduledStart) ||
+      !Number.isFinite(scheduledEnd) ||
+      !isOverlapping(start, end, scheduledStart, scheduledEnd)
+    ) {
+      continue;
+    }
+
+    const sameScenarioGroup =
+      scheduled.scenarioGroupId === item.scenarioGroupId;
+
+    const sameSourceGroup =
+      item.sourceGroupId != null &&
+      scheduled.sourceGroupId != null &&
+      Number(scheduled.sourceGroupId) === Number(item.sourceGroupId);
+
+    if (sameScenarioGroup || sameSourceGroup) {
+      return 'Група вже має заняття у цей час';
+    }
+
+    if (
+      Number(scheduled.teacher_id) === Number(item.teacher_id)
+    ) {
+      return 'Викладач уже призначений на інше заняття чернетки';
+    }
+
+    if (
+      Number(scheduled.room_id) === Number(item.room_id)
+    ) {
+      return 'Кімната вже використовується в іншому занятті чернетки';
+    }
+  }
+
+  return null;
 }
 
 async function verifyTeacherQualification(employeeId, activityId) {
@@ -45,201 +162,425 @@ async function verifyTeacherQualification(employeeId, activityId) {
     where: {
       employee_id_activity_id: {
         employee_id: Number(employeeId),
-        activity_id: Number(activityId)
-      }
-    }
+        activity_id: Number(activityId),
+      },
+    },
   });
-  return !!record;
+
+  return Boolean(record);
 }
 
-async function checkScheduleConflicts({ group_id, activity_id, teacher_id, room_id, day_of_week, start_time, end_time, excludeId = null, additionalSchedules = [] }) {
-  const startMins = timeToMinutes(start_time);
-  const endMins = timeToMinutes(end_time);
+async function checkScheduleConflicts({
+  group_id,
+  activity_id,
+  teacher_id,
+  room_id,
+  day_of_week,
+  start_time,
+  end_time,
+  excludeId = null,
+  additionalSchedules = [],
+}) {
+  const start = timeToMinutes(start_time);
+  const end = timeToMinutes(end_time);
 
-  if (isNaN(startMins) || isNaN(endMins) || startMins < DAY_START || endMins > DAY_END || startMins >= endMins) {
-    return { valid: false, code: 400, message: 'Заняття виходить за межі робочого дня (09:00 - 17:00) або вказано некоректний час' };
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start < DAY_START ||
+    end > DAY_END ||
+    start >= end
+  ) {
+    return {
+      valid: false,
+      code: 400,
+      message: 'Заняття має бути в межах 09:00–17:00',
+    };
   }
 
-  if (isReservedSlot(startMins, endMins)) {
-    return { valid: false, code: 400, message: 'Час збігається з тихим часом (соном) або харчуванням' };
+  if (isReservedSlot(start, end)) {
+    return {
+      valid: false,
+      code: 400,
+      message: 'Час зарезервований для харчування або сну',
+    };
   }
 
-  const qualified = await verifyTeacherQualification(teacher_id, activity_id);
+  const qualified = await verifyTeacherQualification(
+    teacher_id,
+    activity_id
+  );
+
   if (!qualified) {
-    return { valid: false, code: 400, message: 'Викладач не має кваліфікації/права проводити цей предмет' };
+    return {
+      valid: false,
+      code: 400,
+      message: 'Викладач не має відповідної кваліфікації',
+    };
   }
 
-  const existingInDb = await prisma.schedules.findMany({
-    where: { day_of_week: Number(day_of_week) }
+  const existing = await prisma.schedules.findMany({
+    where: { day_of_week: Number(day_of_week) },
   });
 
-  const allSchedules = [...existingInDb, ...additionalSchedules.filter(s => Number(s.day_of_week) === Number(day_of_week))];
+  const allSchedules = [
+    ...existing.filter(item => item.id !== Number(excludeId)),
+    ...additionalSchedules,
+  ];
 
-  for (const item of allSchedules) {
-    if (excludeId && item.id && item.id === Number(excludeId)) continue;
+  const conflict = getScheduleConflicts(
+    {
+      group_id,
+      sourceGroupId: group_id,
+      teacher_id,
+      room_id,
+      day_of_week,
+      start_time,
+      end_time,
+    },
+    allSchedules
+  );
 
-    let itemStart, itemEnd;
-
-    if (item.start_time instanceof Date) {
-      itemStart = item.start_time.getUTCHours() * 60 + item.start_time.getUTCMinutes();
-      itemEnd = item.end_time.getUTCHours() * 60 + item.end_time.getUTCMinutes();
-    } else if (typeof item.start_time === 'string' && typeof item.end_time === 'string') {
-      itemStart = timeToMinutes(item.start_time);
-      itemEnd = timeToMinutes(item.end_time);
-    } else {
-      continue;
-    }
-
-    if (isOverlapping(startMins, endMins, itemStart, itemEnd)) {
-      if (item.teacher_id === Number(teacher_id)) {
-        return { valid: false, code: 409, message: `Конфлікт: Викладач (ID: ${teacher_id}) вже має заняття у цей час` };
-      }
-      if (item.group_id === Number(group_id)) {
-        return { valid: false, code: 409, message: `Конфлікт: Група (ID: ${group_id}) вже має інше заняття у цей час` };
-      }
-      if (item.room_id === Number(room_id)) {
-        return { valid: false, code: 409, message: `Конфлікт: Кімната (ID: ${room_id}) вже зайнята` };
-      }
-    }
+  if (conflict) {
+    return { valid: false, code: 409, message: conflict };
   }
 
   return { valid: true };
 }
 
 function validateAgeBalanceWithDraft(groupsInDb, draft) {
-  const groupSchedulesCount = {};
-  groupsInDb.forEach(g => {
-    groupSchedulesCount[g.id] = g.schedules ? g.schedules.length : 0;
-  });
+  const counts = {};
 
-  draft.forEach(item => {
-    const gId = item.group_id;
-    groupSchedulesCount[gId] = (groupSchedulesCount[gId] || 0) + 1;
-  });
+  for (const group of groupsInDb) {
+    counts[group.id] = group.schedules
+      ? group.schedules.length
+      : 0;
+  }
+
+  for (const item of draft) {
+    if (item.group_id != null) {
+      counts[item.group_id] = (counts[item.group_id] || 0) + 1;
+    }
+  }
 
   const ageMap = {};
-  groupsInDb.forEach(g => {
-    const age = g.target_age;
-    const count = groupSchedulesCount[g.id] || 0;
+
+  for (const group of groupsInDb) {
+    const age = group.target_age;
+
     if (!ageMap[age]) ageMap[age] = [];
-    ageMap[age].push({ groupId: g.id, groupName: g.name, count });
-  });
+
+    ageMap[age].push({
+      groupId: group.id,
+      groupName: group.name,
+      count: counts[group.id] || 0,
+    });
+  }
 
   const imbalances = [];
-  for (const [age, list] of Object.entries(ageMap)) {
-    if (list.length > 1) {
-      const firstCount = list[0].count;
-      const isBalanced = list.every(item => item.count === firstCount);
-      if (!isBalanced) {
-        imbalances.push({ target_age: Number(age), groups: list });
+
+  for (const [age, groups] of Object.entries(ageMap)) {
+    if (groups.length > 1) {
+      const firstCount = groups[0].count;
+
+      if (!groups.every(group => group.count === firstCount)) {
+        imbalances.push({
+          target_age: Number(age),
+          groups,
+        });
       }
     }
   }
 
-  return { isBalanced: imbalances.length === 0, imbalances };
+  return {
+    isBalanced: imbalances.length === 0,
+    imbalances,
+  };
 }
 
-async function generateDraftSchedule({ day_of_week, items }) {
+/**
+ * Generates a temporary schedule for one weekly cycle.
+ *
+ * Input:
+ * {
+ *   scenarioId,
+ *   variantId,
+ *   groups: [{ scenarioGroupId, sourceGroupId?, childrenCount,
+ *              capacity, target_age }],
+ *   items: [{ scenarioGroupId, activity_id, teacher_id,
+ *             room_id, day_of_week, duration }]
+ * }
+ *
+ * Does not create or update database records.
+ */
+async function generateDraftSchedule({
+  scenarioId,
+  variantId,
+  groups,
+  items,
+}) {
+  if (typeof scenarioId !== 'string' || !scenarioId.trim()) {
+    throw new Error('scenarioId є обов’язковим');
+  }
+
+  if (typeof variantId !== 'string' || !variantId.trim()) {
+    throw new Error('variantId є обов’язковим');
+  }
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new Error('Потрібно передати сценарні групи');
+  }
+
+  if (!Array.isArray(items)) {
+    throw new Error('items має бути масивом');
+  }
+
+  const groupMap = new Map();
+
+  for (const group of groups) {
+    if (
+      typeof group.scenarioGroupId !== 'string' ||
+      !group.scenarioGroupId.trim() ||
+      groupMap.has(group.scenarioGroupId)
+    ) {
+      throw new Error('Некоректний або повторний scenarioGroupId');
+    }
+
+    if (
+      !isPositiveInteger(group.childrenCount) ||
+      !isPositiveInteger(group.capacity) ||
+      Number(group.childrenCount) > Number(group.capacity)
+    ) {
+      throw new Error(
+        `Некоректна кількість дітей або місткість групи ${group.scenarioGroupId}`
+      );
+    }
+
+    if (
+      group.sourceGroupId != null &&
+      !isPositiveInteger(group.sourceGroupId)
+    ) {
+      throw new Error('sourceGroupId має бути додатним цілим числом');
+    }
+
+    groupMap.set(group.scenarioGroupId, group);
+  }
+
+  const days = [...new Set(
+    items.map(item => Number(item.day_of_week))
+  )];
+
+  for (const day of days) {
+    if (!Number.isInteger(day) || day < 1 || day > 7) {
+      throw new Error('day_of_week має бути цілим числом від 1 до 7');
+    }
+  }
+
+  const sourceGroupIds = [
+    ...new Set(
+      groups
+        .filter(group => group.sourceGroupId != null)
+        .map(group => Number(group.sourceGroupId))
+    ),
+  ];
+
+  const roomIds = [
+    ...new Set(
+      items
+        .map(item => Number(item.room_id))
+        .filter(id => Number.isInteger(id) && id > 0)
+    ),
+  ];
+
+
+  const [sourceGroups, rooms, existingSchedules] = await Promise.all([
+    sourceGroupIds.length
+      ? prisma.groups.findMany({
+          where: { id: { in: sourceGroupIds } },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+
+    roomIds.length
+      ? prisma.rooms.findMany({
+          where: { id: { in: roomIds } },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+
+    days.length
+      ? prisma.schedules.findMany({
+          where: { day_of_week: { in: days } },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const existingGroupIds = new Set(sourceGroups.map(group => group.id));
+  const existingRoomIds = new Set(rooms.map(room => room.id));
+
   const draft = [];
   const errors = [];
-  const dayNumber = Number(day_of_week);
 
-  const groupsInDb = await prisma.groups.findMany({
-    include: { schedules: true }
-  });
+  const sortedItems = [...items].sort((a, b) =>
+    Number(a.day_of_week) - Number(b.day_of_week)
+  );
 
-  const ageGroupCounts = {};
-  const groupTargetAges = {};
+  for (let index = 0; index < sortedItems.length; index++) {
+    const item = sortedItems[index];
 
-  groupsInDb.forEach(g => {
-    groupTargetAges[g.id] = g.target_age;
-    if (!ageGroupCounts[g.target_age]) ageGroupCounts[g.target_age] = {};
-    ageGroupCounts[g.target_age][g.id] = g.schedules ? g.schedules.length : 0;
-  });
+    const fail = reason => {
+      errors.push({
+        itemIndex: index,
+        item,
+        reason,
+      });
+    };
 
-  const sortedItems = [...items].sort((a, b) => {
-    const ageA = groupTargetAges[a.group_id] || 0;
-    const ageB = groupTargetAges[b.group_id] || 0;
-    const countA = (ageGroupCounts[ageA] && ageGroupCounts[ageA][a.group_id]) || 0;
-    const countB = (ageGroupCounts[ageB] && ageGroupCounts[ageB][b.group_id]) || 0;
-    return countA - countB;
-  });
+    const group = groupMap.get(item.scenarioGroupId);
 
-  for (const reqItem of sortedItems) {
-    const { group_id, activity_id, teacher_id, room_id, duration } = reqItem;
-
-    // ВАЛІДАЦІЯ DURATION:
-    const durationMins = Number(duration);
-    if (!Number.isInteger(durationMins) || durationMins <= 0) {
-      errors.push({ item: reqItem, reason: 'Тривалість заняття (duration) має бути додатним цілим числом у хвилинах' });
+    if (!group) {
+      fail('Заняття посилається на невідому сценарну групу');
       continue;
     }
 
-    const targetAge = groupTargetAges[group_id];
-    if (targetAge && ageGroupCounts[targetAge]) {
-      const currentCount = ageGroupCounts[targetAge][group_id] || 0;
-      const otherGroupCounts = Object.entries(ageGroupCounts[targetAge])
-        .filter(([gId]) => Number(gId) !== Number(group_id))
-        .map(([, cnt]) => cnt);
+    const {
+      activity_id,
+      teacher_id,
+      room_id,
+      day_of_week,
+      duration,
+    } = item;
 
-      if (otherGroupCounts.length > 0) {
-        const minOtherCount = Math.min(...otherGroupCounts);
-        if (currentCount > minOtherCount) {
-          errors.push({ item: reqItem, reason: 'Пропущено для забезпечення рівномірності занять серед груп одного віку' });
-          continue;
-        }
-      }
+    if (
+      !Number.isInteger(Number(day_of_week)) ||
+      Number(day_of_week) < 1 ||
+      Number(day_of_week) > 7
+    ) {
+      fail('День тижня має бути цілим числом від 1 до 7');
+      continue;
     }
 
-    const qualified = await verifyTeacherQualification(teacher_id, activity_id);
+    if (!isPositiveInteger(duration)) {
+      fail('Тривалість має бути додатним цілим числом у хвилинах');
+      continue;
+    }
+
+    if (Number(duration) > DAY_END - DAY_START) {
+      fail('Тривалість заняття перевищує робочий день 09:00–17:00');
+      continue;
+    }
+    if (
+      !isPositiveInteger(activity_id) ||
+      !isPositiveInteger(teacher_id) ||
+      !isPositiveInteger(room_id)
+    ) {
+      fail('ID предмета, викладача та кімнати мають бути додатними цілими числами');
+      continue;
+    }
+
+    if (!existingRoomIds.has(Number(room_id))) {
+      fail('Вказана кімната не існує');
+      continue;
+    }
+
+    if (
+      group.sourceGroupId != null &&
+      !existingGroupIds.has(Number(group.sourceGroupId))
+    ) {
+      fail('Початкова група не існує');
+      continue;
+    }
+
+    const qualified = await verifyTeacherQualification(
+      teacher_id,
+      activity_id
+    );
+
     if (!qualified) {
-      errors.push({ item: reqItem, reason: 'Викладач не має відповідної кваліфікації/активності' });
+      fail('Викладач не має кваліфікації для цього заняття');
       continue;
     }
+
+    const sourceGroupId = group.sourceGroupId == null
+      ? null
+      : Number(group.sourceGroupId);
 
     let foundSlot = null;
-    for (let current = DAY_START; current + durationMins <= DAY_END; current += 15) {
-      const slotEnd = current + durationMins;
-      if (isReservedSlot(current, slotEnd)) continue;
 
-      const check = await checkScheduleConflicts({
-        group_id, activity_id, teacher_id, room_id,
-        day_of_week: dayNumber,
-        start_time: minutesToTime(current),
-        end_time: minutesToTime(slotEnd),
-        additionalSchedules: draft
-      });
+    for (
+      let start = DAY_START;
+      start + Number(duration) <= DAY_END;
+      start += SLOT_STEP
+    ) {
+      const end = start + Number(duration);
 
-      if (check.valid) {
-        foundSlot = { start: minutesToTime(current), end: minutesToTime(slotEnd) };
-        break;
-      }
-    }
+      if (isReservedSlot(start, end)) continue;
 
-    if (foundSlot) {
-      draft.push({
-        group_id: Number(group_id),
+      const candidate = {
+        scenarioId,
+        variantId,
+        scenarioGroupId: item.scenarioGroupId,
+        sourceGroupId,
         activity_id: Number(activity_id),
         teacher_id: Number(teacher_id),
         room_id: Number(room_id),
-        day_of_week: dayNumber,
-        start_time: minutesToDate(timeToMinutes(foundSlot.start)),
-        end_time: minutesToDate(timeToMinutes(foundSlot.end)),
-        formatted_start: foundSlot.start,
-        formatted_end: foundSlot.end
-      });
+        day_of_week: Number(day_of_week),
+        start_time: minutesToDate(start),
+        end_time: minutesToDate(end),
+        formatted_start: minutesToTime(start),
+        formatted_end: minutesToTime(end),
+      };
 
-      if (targetAge && ageGroupCounts[targetAge]) {
-        ageGroupCounts[targetAge][group_id] = (ageGroupCounts[targetAge][group_id] || 0) + 1;
-      }
+      const dbConflict = getScheduleConflicts(
+        candidate,
+        existingSchedules
+      );
+
+      if (dbConflict) continue;
+
+      const draftConflict = getDraftConflicts(candidate, draft);
+
+      if (draftConflict) continue;
+
+      foundSlot = candidate;
+      break;
+    }
+
+    if (foundSlot) {
+      draft.push(foundSlot);
     } else {
-      errors.push({ item: reqItem, reason: 'Неможливо розмістити без конфліктів у робочі години' });
+      fail(
+        'Не вдалося знайти вільний час без конфліктів у межах 09:00–17:00'
+      );
     }
   }
 
-  const balanceCheck = validateAgeBalanceWithDraft(groupsInDb, draft);
+  return {
+    scenarioId,
+    variantId,
 
-  return { draft, errors, balanceCheck };
+    groupComposition: groups.map(group => ({
+      scenarioGroupId: group.scenarioGroupId,
+      sourceGroupId: group.sourceGroupId ?? null,
+      childrenCount: Number(group.childrenCount),
+      capacity: Number(group.capacity),
+      target_age: group.target_age ?? null,
+    })),
+
+    isFeasible: errors.length === 0,
+
+    summary: {
+      totalItems: items.length,
+      scheduledItems: draft.length,
+      unscheduledItems: errors.length,
+    },
+
+    draft,
+    errors,
+
+    // Підтверджуємо, що це лише тимчасовий результат.
+    persisted: false,
+  };
 }
 
 module.exports = {
@@ -249,5 +590,7 @@ module.exports = {
   validateAgeBalanceWithDraft,
   isValidTimeFormat,
   timeToMinutes,
-  minutesToDate
+  minutesToDate,
+  isReservedSlot,
+  isOverlapping,
 };
