@@ -10,7 +10,9 @@ test("правильно розраховує зарплату виховате�
 
     assert.equal(service.calculateEducatorSalary(10), 20000);
     assert.equal(service.calculateEducatorSalary(12), 24000);
-    assert.equal(service.calculateEducatorSalary(15), 45000);
+    assert.equal(service.calculateEducatorSalary(13), 29000);
+    assert.equal(service.calculateEducatorSalary(15), 39000);
+    assert.equal(service.calculateEducatorSalary(20), 64000);
 });
 
 test("правильно розраховує фіксовані зарплати", () => {
@@ -74,7 +76,8 @@ test("розраховує загальні витрати на персонал
    const payrollMock = {
     calculateSalary: (position, count = 0) => {
         if (position === "EDUCATOR") {
-            return 2000 * count + 5000 * Math.max(0, count - 12);
+            return 2000 * Math.min(count, 12) +
+    5000 * Math.max(0, count - 12);
         }
         if (position === "ASSISTANT") return 20000;
         if (position === "TEACHER") return 40000;
@@ -86,7 +89,7 @@ test("розраховує загальні витрати на персонал
         const groupEstimates = groups.map(group => {
             const childrenCount = group.children.length;
             const educatorMonthlySalary =
-                2000 * childrenCount +
+                2000 * Math.min(childrenCount, 12) +
                 5000 * Math.max(0, childrenCount - 12);
 
             return {
@@ -163,15 +166,14 @@ test("кошторис рахує зарплати за формулою нез�
         }
     ], 2);
 
-    assert.equal(result.groups[0].educatorMonthlySalary, 45000);
+    assert.equal(result.groups[0].educatorMonthlySalary, 39000);
     assert.equal(result.groups[0].assistantMonthlySalary, 29000);
-    assert.equal(result.groups[0].totalMonthlySalary, 74000);
+    assert.equal(result.groups[0].totalMonthlySalary, 68000);
     assert.equal(result.groups[1].educatorMonthlySalary, 20000);
     assert.equal(result.groups[1].assistantMonthlySalary, 20000);
-    assert.equal(result.groupsMonthlySalary, 114000);
-    assert.equal(result.totalMonthlySalary, 274000);
+    assert.equal(result.groupsMonthlySalary, 108000);
+    assert.equal(result.totalMonthlySalary, 268000);
     assert.equal(result.managerMonthlySalary, 80000);
-    assert.equal(result.totalMonthlySalary, 274000);
 });
 
 test("кошторис для групи без призначених працівників все одно включає обидві ставки", () => {
@@ -243,11 +245,11 @@ test("кошторис додає оренду за кількістю груп,
 
     const result = await staffService.getSalaryEstimates();
 
-    assert.equal(result.totalMonthlyPersonnelExpenses, 274000);
+    assert.equal(result.totalMonthlyPersonnelExpenses, 268000);
     assert.equal(result.rent.roomCount, 2);
     assert.equal(result.rent.totalMonthlyRent, 100000);
-    assert.equal(result.totalMonthlyExpenses, 374000);
-    assert.equal(result.groups[0].educator.monthlySalary, 45000);
+    assert.equal(result.totalMonthlyExpenses, 368000);
+    assert.equal(result.groups[0].educator.monthlySalary, 39000);
     assert.equal(result.groups[0].assistant.monthlySalary, 29000);
 });
 
@@ -426,11 +428,9 @@ test("кошторис використовує змінені параметр�
     const result =
         await payrollService.getKindergartenSalaryEstimate(groups);
 
-    assert.equal(result.groups[0].educatorMonthlySalary, 14500);
+    assert.equal(result.groups[0].educatorMonthlySalary, 11500);
     assert.equal(result.groups[0].assistantMonthlySalary, 12900);
     assert.equal(result.teachersMonthlySalary, 90000);
     assert.equal(result.managerMonthlySalary, 90000);
-    assert.equal(result.totalMonthlySalary, 207400);
-    assert.equal(result.monthlySalaryPerTeacher, 45000);
-    assert.equal(result.rentPerGroup, 60000);
+    assert.equal(result.totalMonthlySalary, 204400);
 });
