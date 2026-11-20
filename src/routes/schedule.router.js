@@ -212,8 +212,10 @@ router.delete('/schedules/:id', authorizeRoles('ADMIN', 'MANAGER', 'TEACHER'), a
   res.status(204).send();
 }));
 
+
+
 router.post('/schedules/generate-draft', authorizeRoles('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
-  const { day_of_week, items } = req.body;
+  const { day_of_week, items } = req.body || {};
 
   if (!isValidDayOfWeek(day_of_week)) {
     return res.status(400).json({
@@ -227,12 +229,38 @@ router.post('/schedules/generate-draft', authorizeRoles('ADMIN', 'MANAGER'), asy
     });
   }
 
+  const requiredFields = [
+    "group_id",
+    "activity_id",
+    "teacher_id",
+    "room_id",
+    "duration",
+  ];
+
+  for (const [index, item] of items.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return res.status(400).json({
+        error: `Елемент items[${index}] має бути об'єктом`
+      });
+    }
+
+    for (const field of requiredFields) {
+      if (!Number.isInteger(item[field]) || item[field] <= 0) {
+        return res.status(400).json({
+          error: `Поле items[${index}].${field} має бути додатним цілим числом`
+        });
+      }
+    }
+  }
+
   const result = await generateDraftSchedule({
-    day_of_week: Number(day_of_week),
-    items
+    day_of_week,
+    items,
   });
 
   res.status(200).json(result);
 }));
+
+
 
 module.exports = router;
