@@ -16,9 +16,10 @@ function calculateEducatorSalary(
     childrenCount,
     settings = DEFAULT_EXPENSE_SETTINGS
 ) {
-    return settings.educatorBasePerChild * childrenCount +
+    return settings.educatorBasePerChild *
+        Math.min(childrenCount, settings.extraChildrenThreshold) +
         settings.educatorExtraPerChild *
-            Math.max(0, childrenCount - settings.extraChildrenThreshold);
+        Math.max(0, childrenCount - settings.extraChildrenThreshold);
 }
 
 function calculateAssistantSalary(
