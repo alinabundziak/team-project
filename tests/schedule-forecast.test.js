@@ -146,11 +146,56 @@ test('rejects missing scenarioId', async () => {
       service.generateDraftSchedule(
         createScenario({ scenarioId: '' })
       ),
-    /scenarioId/
+    error => error.status === 400 && /scenarioId/.test(error.message)
   );
 });
 
-test('rejects an unknown scenario group', async () => {
+test('rejects missing variantId with a bad request error', async () => {
+  const { service } = createMocks();
+
+  await assert.rejects(
+    () =>
+      service.generateDraftSchedule(
+        createScenario({ variantId: '' })
+      ),
+    error => error.status === 400 && /variantId/.test(error.message)
+  );
+});
+
+test('rejects malformed scenarioGroupId with a bad request error', async () => {
+  const { service } = createMocks();
+
+  const scenario = createScenario({
+    groups: [
+      {
+        scenarioGroupId: '',
+        childrenCount: 14,
+        capacity: 20,
+      },
+    ],
+  });
+
+  await assert.rejects(
+    () => service.generateDraftSchedule(scenario),
+    error => error.status === 400 && /scenarioGroupId/.test(error.message)
+  );
+});
+
+test('rejects malformed group and lesson entries with a bad request error', async () => {
+  const { service } = createMocks();
+
+  await assert.rejects(
+    () => service.generateDraftSchedule(createScenario({ groups: [null] })),
+    error => error.status === 400 && /сценарна група/.test(error.message)
+  );
+
+  await assert.rejects(
+    () => service.generateDraftSchedule(createScenario({ items: [null] })),
+    error => error.status === 400 && /заняття/.test(error.message)
+  );
+});
+
+test('rejects an unknown scenario group with a bad request error', async () => {
   const { service } = createMocks();
 
   const scenario = createScenario({
@@ -166,11 +211,10 @@ test('rejects an unknown scenario group', async () => {
     ],
   });
 
-  const result = await service.generateDraftSchedule(scenario);
-
-  assert.equal(result.isFeasible, false);
-  assert.equal(result.errors.length, 1);
-  assert.match(result.errors[0].reason, /невідому сценарну групу/);
+  await assert.rejects(
+    () => service.generateDraftSchedule(scenario),
+    error => error.status === 400 && /невідому сценарну групу/.test(error.message)
+  );
 });
 
 test('rejects an invalid duration', async () => {

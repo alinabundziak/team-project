@@ -1,5 +1,6 @@
 
 const prisma = require('../config/prisma');
+const AppError = require('../utils/AppError');
 
 const DAY_START = 9 * 60;
 const DAY_END = 17 * 60;
@@ -320,19 +321,27 @@ async function generateDraftSchedule({
   items,
 }) {
   if (typeof scenarioId !== 'string' || !scenarioId.trim()) {
-    throw new Error('scenarioId є обов’язковим');
+    throw new AppError(400, 'scenarioId є обов’язковим');
   }
 
   if (typeof variantId !== 'string' || !variantId.trim()) {
-    throw new Error('variantId є обов’язковим');
+    throw new AppError(400, 'variantId є обов’язковим');
   }
 
   if (!Array.isArray(groups) || groups.length === 0) {
-    throw new Error('Потрібно передати сценарні групи');
+    throw new AppError(400, 'Потрібно передати сценарні групи');
   }
 
   if (!Array.isArray(items)) {
-    throw new Error('items має бути масивом');
+    throw new AppError(400, 'items має бути масивом');
+  }
+
+  if (groups.some(group => !group || typeof group !== 'object' || Array.isArray(group))) {
+    throw new AppError(400, 'Кожна сценарна група має бути об’єктом');
+  }
+
+  if (items.some(item => !item || typeof item !== 'object' || Array.isArray(item))) {
+    throw new AppError(400, 'Кожне заняття має бути об’єктом');
   }
 
   const groupMap = new Map();
@@ -343,7 +352,7 @@ async function generateDraftSchedule({
       !group.scenarioGroupId.trim() ||
       groupMap.has(group.scenarioGroupId)
     ) {
-      throw new Error('Некоректний або повторний scenarioGroupId');
+      throw new AppError(400, 'Некоректний або повторний scenarioGroupId');
     }
 
     if (
@@ -351,7 +360,8 @@ async function generateDraftSchedule({
       !isPositiveInteger(group.capacity) ||
       Number(group.childrenCount) > Number(group.capacity)
     ) {
-      throw new Error(
+      throw new AppError(
+        400,
         `Некоректна кількість дітей або місткість групи ${group.scenarioGroupId}`
       );
     }
@@ -360,7 +370,7 @@ async function generateDraftSchedule({
       group.sourceGroupId != null &&
       !isPositiveInteger(group.sourceGroupId)
     ) {
-      throw new Error('sourceGroupId має бути додатним цілим числом');
+      throw new AppError(400, 'sourceGroupId має бути додатним цілим числом');
     }
 
     groupMap.set(group.scenarioGroupId, group);
@@ -372,7 +382,7 @@ async function generateDraftSchedule({
 
   for (const day of days) {
     if (!Number.isInteger(day) || day < 1 || day > 7) {
-      throw new Error('day_of_week має бути цілим числом від 1 до 7');
+      throw new AppError(400, 'day_of_week має бути цілим числом від 1 до 7');
     }
   }
 
@@ -439,8 +449,10 @@ async function generateDraftSchedule({
     const group = groupMap.get(item.scenarioGroupId);
 
     if (!group) {
-      fail('Заняття посилається на невідому сценарну групу');
-      continue;
+      throw new AppError(
+        400,
+        `Заняття ${index + 1} посилається на невідому сценарну групу`
+      );
     }
 
     const {
