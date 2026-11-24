@@ -422,7 +422,7 @@ class AnalyticsService {
       expectedTotalRevenue: expectedTotalRevenue.toFixed(2),
     };
   }
-  async calculateScenario(scenarioParams = {}) {
+  async calculateScenario(scenarioParams = {}, evaluateSchedule = null) {
     const period = scenarioParams.period;
     const forecast = await this.getRevenueForecast(period);
 
@@ -722,7 +722,6 @@ class AnalyticsService {
         ? null
         : toCount(scenarioParams.maxChildrenPerGroup, "maxChildrenPerGroup");
 
-    const feasibility = scenarioParams.feasibilityByGroupCount ?? {};
     const candidates = [];
 
     for (const count of uniqueCounts) {
@@ -781,17 +780,35 @@ class AnalyticsService {
       const capacityFeasible =
         maxCapacity == null || counts.every((value) => value <= maxCapacity);
 
-      const scheduleFeasible = Object.prototype.hasOwnProperty.call(
-        feasibility,
-        count,
-      )
-        ? feasibility[count] === true
-        : null;
+      const variantId = `${scenarioParams.scenarioId ?? periodValue}-groups-${count}`;
+
+      const scenarioGroups = counts.map((childrenCount, index) => ({
+        scenarioGroupId: `group-${index + 1}`,
+        childrenCount,
+        capacity: Math.min(maxCapacity ?? 20, 20),
+      }));
+
+      const scheduleResult =
+        capacityFeasible && typeof evaluateSchedule === "function"
+          ? await evaluateSchedule({
+              scenarioId: scenarioParams.scenarioId ?? periodValue,
+              variantId,
+              groups: scenarioGroups,
+              weeklySchedule: scenarioParams.weeklySchedule,
+            })
+          : null;
+
+      const scheduleFeasible =
+        scheduleResult == null
+          ? null
+          : scheduleResult.isFeasible === true &&
+            Array.isArray(scheduleResult.draft) &&
+            scheduleResult.draft.length > 0;
 
       const feasible = capacityFeasible && scheduleFeasible === true;
 
       candidates.push({
-        variantId: `${scenarioParams.scenarioId ?? periodValue}-groups-${count}`,
+        variantId,
         groupsCount: count,
         groupDistribution: counts,
         simulatedChildrenCount: requestedCount,
@@ -815,6 +832,7 @@ class AnalyticsService {
         profitDelta: profit.sub(baselineProfit).toFixed(2),
         capacityFeasible,
         scheduleFeasible,
+        scheduleResult,
         feasible,
       });
     }
@@ -837,10 +855,12 @@ class AnalyticsService {
         revenue: candidate.revenue,
         expenses: candidate.expenses,
         accrualProfit: candidate.accrualProfit,
+        scheduleFeasible: candidate.scheduleFeasible,
+        isFeasible: candidate.feasible,
         schedule: {
-          feasible: null,
-          draft: null,
-          unassigned: [],
+          feasible: candidate.scheduleFeasible,
+          draft: candidate.scheduleResult?.draft ?? null,
+          unassigned: candidate.scheduleResult?.errors ?? [],
         },
       })),
       assumptions: {

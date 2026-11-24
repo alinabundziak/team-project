@@ -71,6 +71,19 @@ function createAnalytics(options = {}) {
   });
 }
 
+const mockEvaluateSchedule = async ({ scenarioId, variantId, groups }) => ({
+  scenarioId,
+  variantId,
+  isFeasible: true,
+  draft: groups.map((group) => ({
+    scenarioId,
+    variantId,
+    scenarioGroupId: group.scenarioGroupId,
+  })),
+  errors: [],
+  persisted: false,
+});
+
 test("Прогноз використовує тариф і реальну знижку дитини", async () => {
   const analytics = createAnalytics({
     children: [
@@ -169,13 +182,15 @@ test("Сценарій правильно розраховує дохід, за�
     ],
   });
 
-  const result = await analytics.calculateScenario({
-    period: "2026-12",
-    childrenCount: 1,
-    targetGroupsCount: 1,
-    candidateGroupCounts: [1],
-    feasibilityByGroupCount: { 1: true },
-  });
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 1,
+      targetGroupsCount: 1,
+      candidateGroupCounts: [1],
+    },
+    mockEvaluateSchedule,
+  );
 
   assert.equal(result.scenario.simulatedRevenue, "23400.00");
   assert.equal(result.scenario.simulatedExpenses, "80400.00");
@@ -198,13 +213,15 @@ test("Сценарій враховує зарплату та оренду пр�
     rentPerGroup: 10000,
   });
 
-  const result = await analytics.calculateScenario({
-    period: "2026-12",
-    childrenCount: 1,
-    targetGroupsCount: 1,
-    candidateGroupCounts: [1],
-    feasibilityByGroupCount: { 1: true },
-  });
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 1,
+      targetGroupsCount: 1,
+      candidateGroupCounts: [1],
+    },
+    mockEvaluateSchedule,
+  );
 
   assert.equal(result.scenario.simulatedRevenue, "23400.00");
   assert.equal(result.scenario.payrollExpense, "22000.00");
@@ -228,16 +245,18 @@ test("Сценарій підтримує нерівномірний розпо�
     rentPerGroup: 10000,
   });
 
-  const result = await analytics.calculateScenario({
-    period: "2026-12",
-    childrenCount: 9,
-    targetGroupsCount: 3,
-    candidateGroupCounts: [3],
-    manualGroupDistributions: {
-      3: [2, 3, 4],
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 9,
+      targetGroupsCount: 3,
+      candidateGroupCounts: [3],
+      manualGroupDistributions: {
+        3: [2, 3, 4],
+      },
     },
-    feasibilityByGroupCount: { 3: true },
-  });
+    mockEvaluateSchedule,
+  );
 
   assert.deepEqual(result.scenario.groupDistribution, [2, 3, 4]);
   assert.equal(result.scenario.groupsCount, 3);
@@ -263,17 +282,15 @@ test("Система обирає найвигідніший допустими�
     rentPerGroup: 10000,
   });
 
-  const result = await analytics.calculateScenario({
-    period: "2026-12",
-    childrenCount: 6,
-    targetGroupsCount: 2,
-    candidateGroupCounts: [1, 2, 3],
-    feasibilityByGroupCount: {
-      1: true,
-      2: true,
-      3: true,
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 6,
+      targetGroupsCount: 2,
+      candidateGroupCounts: [1, 2, 3],
     },
-  });
+    mockEvaluateSchedule,
+  );
 
   assert.equal(result.groupComparisonScenarios.length, 3);
   assert.equal(result.recommendedVariantId, "2026-12-groups-1");
@@ -292,16 +309,15 @@ test("Система обирає найменший збиток, якщо вс
     children,
   });
 
-  const result = await analytics.calculateScenario({
-    period: "2026-12",
-    childrenCount: 2,
-    targetGroupsCount: 2,
-    candidateGroupCounts: [1, 2],
-    feasibilityByGroupCount: {
-      1: true,
-      2: true,
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 2,
+      targetGroupsCount: 2,
+      candidateGroupCounts: [1, 2],
     },
-  });
+    mockEvaluateSchedule,
+  );
 
   assert.equal(result.groupComparisonScenarios.length, 2);
   assert.equal(result.scenario.groupsCount, 1);
@@ -350,7 +366,6 @@ test("Річна оплата застосовує додаткову знижк
     childrenCount: 1,
     candidateGroupCounts: [1],
     paymentPlan: "ANNUAL",
-    feasibilityByGroupCount: { 1: true },
   });
 
   assert.equal(result.variants[0].revenue.tuition, "13200.00");
@@ -375,7 +390,6 @@ test("Річна оплата застосовується після персо
     childrenCount: 1,
     candidateGroupCounts: [1],
     paymentPlan: "ANNUAL",
-    feasibilityByGroupCount: { 1: true },
   });
 
   assert.equal(result.variants[0].revenue.tuition, "10560.00");
@@ -401,7 +415,6 @@ test("Сценарій відхиляє знижку понад 30%", async () =
       childrenCount: 1,
       candidateGroupCounts: [1],
       discountChangePercent: 35,
-      feasibilityByGroupCount: { 1: true },
     }),
     {
       status: 400,
@@ -425,7 +438,6 @@ test("Сценарій не дозволяє понад 20 дітей в одн�
       period: "2026-12",
       childrenCount: 21,
       candidateGroupCounts: [1],
-      feasibilityByGroupCount: { 1: true },
     }),
     {
       status: 400,
@@ -457,7 +469,6 @@ test("Сценарій враховує конкретних дітей чере
     childrenCount: 1,
     includedChildIds: [2],
     candidateGroupCounts: [1],
-    feasibilityByGroupCount: { 1: true },
   });
 
   assert.equal(result.variants[0].revenue.tuition, "15000.00");
@@ -487,7 +498,6 @@ test("При зменшенні кількості дітей використо
     period: "2026-12",
     childrenCount: 1,
     candidateGroupCounts: [1],
-    feasibilityByGroupCount: { 1: true },
   });
 
   assert.equal(result.variants[0].revenue.tuition, "13500.00");
@@ -512,7 +522,6 @@ test("Сценарій відхиляє ручний розподіл із не�
       manualGroupDistributions: {
         3: [2, 3, 5],
       },
-      feasibilityByGroupCount: { 3: true },
     }),
     {
       status: 400,
@@ -572,4 +581,89 @@ test("Сценарій відхиляє некоректний відсоток 
       message: /Відсотки змін мають бути числами/,
     },
   );
+});
+
+test("Система не рекомендує недопустимий розклад", async () => {
+  const analytics = createAnalytics({
+    children: [
+      {
+        id: 1,
+        birth_date: new Date("2023-01-01"),
+        discount_id: null,
+        discounts: null,
+      },
+    ],
+  });
+
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 1,
+      candidateGroupCounts: [1],
+    },
+    async () => ({
+      isFeasible: false,
+      draft: [],
+      errors: [{ reason: "No available time slot" }],
+      persisted: false,
+    }),
+  );
+
+  assert.equal(result.recommendedVariantId, null);
+  assert.equal(result.scenario, null);
+  assert.equal(result.variants[0].schedule.feasible, false);
+  assert.equal(result.variants[0].schedule.unassigned.length, 1);
+});
+
+test("Система не рекомендує порожній розклад", async () => {
+  const analytics = createAnalytics({
+    children: [
+      {
+        id: 1,
+        birth_date: new Date("2023-01-01"),
+        discount_id: null,
+        discounts: null,
+      },
+    ],
+  });
+
+  const result = await analytics.calculateScenario(
+    {
+      period: "2026-12",
+      childrenCount: 1,
+      candidateGroupCounts: [1],
+    },
+    async () => ({
+      isFeasible: true,
+      draft: [],
+      errors: [],
+      persisted: false,
+    }),
+  );
+
+  assert.equal(result.recommendedVariantId, null);
+  assert.equal(result.variants[0].schedule.feasible, false);
+});
+test("Система ігнорує допустимість розкладу від клієнта", async () => {
+  const analytics = createAnalytics({
+    children: [
+      {
+        id: 1,
+        birth_date: new Date("2023-01-01"),
+        discount_id: null,
+        discounts: null,
+      },
+    ],
+  });
+
+  const result = await analytics.calculateScenario({
+    period: "2026-12",
+    childrenCount: 1,
+    candidateGroupCounts: [1],
+    feasibilityByGroupCount: { 1: true },
+  });
+
+  assert.equal(result.recommendedVariantId, null);
+  assert.equal(result.scenario, null);
+  assert.equal(result.variants[0].schedule.feasible, null);
 });
