@@ -1,5 +1,7 @@
 const prisma = require("../../config/prisma");
 const Decimal = require("decimal.js");
+const AppError = require("../../utils/AppError");
+const { MEAL_DAYS_PER_MONTH } = require("../../config/pricing");
 const { getTariffAmount } = require("../tariffs/tariffs.service");
 const {
   getKindergartenSalaryEstimate,
@@ -117,7 +119,7 @@ class AnalyticsService {
       const baseDailyMealFee = new Decimal(400);
       const avgRevenuePerChild = baseTuitionPrice
         .mul(0.9)
-        .add(baseDailyMealFee.mul(21));
+        .add(baseDailyMealFee.mul(MEAL_DAYS_PER_MONTH));
 
       const groupsProfitability = groups.map((group) => {
         let groupCharged = new Decimal(0);
@@ -212,8 +214,8 @@ class AnalyticsService {
 
       return {
         period: {
-          startDate: startDate || "РІСЃС– РґР°С‚Рё",
-          endDate: endDate || "РІСЃС– РґР°С‚Рё",
+          startDate: startDate || "всі дати",
+          endDate: endDate || "всі дати",
         },
         revenue: {
           chargesTotal: chargesTotal.toNumber(),
@@ -325,7 +327,6 @@ class AnalyticsService {
     };
   }
   async getRevenueForecast(period) {
-    // РЇРєС‰Рѕ РјС–СЃСЏС†СЊ РЅРµ РїРµСЂРµРґР°РЅРѕ, РІРёРєРѕСЂРёСЃС‚РѕРІСѓС”РјРѕ РїРѕС‚РѕС‡РЅРёР№.
     const now = new Date();
     const forecastPeriod =
       period === undefined || period === null || period === ""
@@ -336,19 +337,15 @@ class AnalyticsService {
       typeof forecastPeriod !== "string" ||
       !/^\d{4}-(0[1-9]|1[0-2])$/.test(forecastPeriod)
     ) {
-      throw new Error("period РјР°С” Р±СѓС‚Рё Сѓ С„РѕСЂРјР°С‚С– YYYY-MM");
+      throw new AppError(400, "period має бути у форматі YYYY-MM");
     }
 
     const periodStart = new Date(`${forecastPeriod}-01T00:00:00.000Z`);
 
-    // РћС‚СЂРёРјСѓС”РјРѕ С‚Р°СЂРёС„, С‡РёРЅРЅРёР№ РЅР° РїРµСЂС€РёР№ РґРµРЅСЊ РјС–СЃСЏС†СЏ.
-    // РЇРєС‰Рѕ С‚Р°СЂРёС„Сѓ РЅРµРјР°С”, СЃРµСЂРІС–СЃ СЃР°Рј РїРѕРІРµСЂРЅРµ РїРѕРјРёР»РєСѓ.
     const tariffAmount = await getTariffAmount("TUITION_MONTHLY", periodStart);
 
     const baseTuitionPrice = new Decimal(tariffAmount.toString());
-    const MEAL_DAYS_PER_MONTH = 21;
 
-    // РЈСЃС– Р·Р°СЂРµС”СЃС‚СЂРѕРІР°РЅС– РґС–С‚Рё, РЅРµР·Р°Р»РµР¶РЅРѕ РІС–Рґ РіСЂСѓРїРё.
     const children = await prisma.children.findMany({
       select: {
         id: true,
@@ -376,7 +373,6 @@ class AnalyticsService {
 
       expectedTuitionRevenue = expectedTuitionRevenue.add(childTuition);
 
-      // Р’С–Рє РЅР° РїРµСЂС€РёР№ РґРµРЅСЊ РїСЂРѕРіРЅРѕР·РѕРІР°РЅРѕРіРѕ РјС–СЃСЏС†СЏ.
       const birthDate = new Date(child.birth_date);
 
       let age = periodStart.getUTCFullYear() - birthDate.getUTCFullYear();
@@ -392,7 +388,6 @@ class AnalyticsService {
         age--;
       }
 
-      // РЁСѓРєР°С”РјРѕ С‚Р°СЂРёС„ С…Р°СЂС‡СѓРІР°РЅРЅСЏ, С‡РёРЅРЅРёР№ РЅР° РґР°С‚Сѓ РїСЂРѕРіРЅРѕР·Сѓ.
       const mealRate = await prisma.meal_rates.findFirst({
         where: {
           age: { lte: age },
@@ -459,9 +454,7 @@ class AnalyticsService {
       const number = Number(value);
 
       if (!Number.isSafeInteger(number) || number < (allowZero ? 0 : 1)) {
-        throw new Error(
-          `${name} РјР°С” Р±СѓС‚Рё РєРѕСЂРµРєС‚РЅРёРј С†С–Р»РёРј С‡РёСЃР»РѕРј`,
-        );
+        throw new AppError(400, `${name} має бути коректним цілим числом`);
       }
 
       return number;
@@ -484,26 +477,31 @@ class AnalyticsService {
             ) * groupsCount
           : registeredCount;
 
-    const tariffChange = new Decimal(
-      scenarioParams.tariffPriceChangePercent ?? 0,
-    );
+    const parsePercent = (value) => {
+      try {
+        const number = new Decimal(value ?? 0);
 
-    const discountChange = new Decimal(
-      scenarioParams.discountChangePercent ?? 0,
-    );
+        if (!number.isFinite()) {
+          throw new Error("Invalid percentage");
+        }
+
+        return number;
+      } catch {
+        throw new AppError(400, "Відсотки змін мають бути числами");
+      }
+    };
+
+    const tariffChange = parsePercent(scenarioParams.tariffPriceChangePercent);
+
+    const discountChange = parsePercent(scenarioParams.discountChangePercent);
     const paymentPlan = scenarioParams.paymentPlan ?? "MONTHLY";
 
     if (!["MONTHLY", "ANNUAL"].includes(paymentPlan)) {
-      throw new Error("paymentPlan має бути MONTHLY або ANNUAL");
+      throw new AppError(400, "paymentPlan має бути MONTHLY або ANNUAL");
     }
 
     const paymentPlanMultiplier =
       paymentPlan === "ANNUAL" ? new Decimal("0.88") : new Decimal(1);
-    if (!tariffChange.isFinite() || !discountChange.isFinite()) {
-      throw new Error(
-        "Р’С–РґСЃРѕС‚РєРё Р·РјС–РЅ РјР°СЋС‚СЊ Р±СѓС‚Рё С‡РёСЃР»Р°РјРё",
-      );
-    }
 
     const baseTariff = new Decimal(
       (await getTariffAmount("TUITION_MONTHLY", periodStart)).toString(),
@@ -514,7 +512,7 @@ class AnalyticsService {
     );
 
     if (scenarioTariff.isNegative()) {
-      throw new Error("РўР°СЂРёС„ РЅРµ РјРѕР¶Рµ Р±СѓС‚Рё РІС–РґвЂ™С”РјРЅРёРј");
+      throw new AppError(400, "Тариф не може бути від’ємним");
     }
 
     const discountOf = (child) =>
@@ -528,7 +526,8 @@ class AnalyticsService {
 
     const validateDiscount = (value) => {
       if (!value.isFinite() || value.lt(0) || value.gt(30)) {
-        throw new Error(
+        throw new AppError(
+          400,
           "Персональна знижка після зміни має бути в межах 0–30%",
         );
       }
@@ -541,7 +540,7 @@ class AnalyticsService {
     const includedChildIds = scenarioParams.includedChildIds;
 
     if (includedChildIds != null && !Array.isArray(includedChildIds)) {
-      throw new Error("includedChildIds має бути масивом");
+      throw new AppError(400, "includedChildIds має бути масивом");
     }
 
     const useAverageForReducedCount =
@@ -558,15 +557,16 @@ class AnalyticsService {
       const uniqueIds = new Set(includedChildIds.map(String));
 
       if (uniqueIds.size !== includedChildIds.length) {
-        throw new Error("includedChildIds не може містити повторення");
+        throw new AppError(400, "includedChildIds не може містити повторення");
       }
 
       if (selectedChildren.length !== includedChildIds.length) {
-        throw new Error("Деякі includedChildIds не знайдено");
+        throw new AppError(400, "Деякі includedChildIds не знайдено");
       }
 
       if (selectedChildren.length !== requestedCount) {
-        throw new Error(
+        throw new AppError(
+          400,
           "Кількість includedChildIds має дорівнювати childrenCount",
         );
       }
@@ -624,7 +624,7 @@ class AnalyticsService {
             .mul(paymentPlanMultiplier),
         );
 
-        mealRevenue = mealRevenue.add(dailyRate.mul(21));
+        mealRevenue = mealRevenue.add(dailyRate.mul(MEAL_DAYS_PER_MONTH));
       }
     }
 
@@ -633,8 +633,9 @@ class AnalyticsService {
       : new Decimal(0);
 
     if (additionalCount > 0 && registeredCount === 0) {
-      throw new Error(
-        "Р”Р»СЏ РЅРѕРІРёС… РґС–С‚РµР№ РїРѕС‚СЂС–Р±РЅРѕ РІРёР·РЅР°С‡РёС‚Рё РІС–РєРѕРІСѓ СЃС‚СЂСѓРєС‚СѓСЂСѓ РґР»СЏ СЂРѕР·СЂР°С…СѓРЅРєСѓ С…Р°СЂС‡СѓРІР°РЅРЅСЏ",
+      throw new AppError(
+        400,
+        "Для нових дітей потрібно визначити вікову структуру для розрахунку харчування",
       );
     }
 
@@ -649,7 +650,9 @@ class AnalyticsService {
         .mul(paymentPlanMultiplier),
     );
 
-    mealRevenue = mealRevenue.add(averageMealRate.mul(21).mul(additionalCount));
+    mealRevenue = mealRevenue.add(
+      averageMealRate.mul(MEAL_DAYS_PER_MONTH).mul(additionalCount),
+    );
 
     const revenue = tuitionRevenue.add(mealRevenue);
 
@@ -677,8 +680,9 @@ class AnalyticsService {
     ];
 
     if (!Array.isArray(candidateCounts) || !candidateCounts.length) {
-      throw new Error(
-        "candidateGroupCounts РјР°С” Р±СѓС‚Рё РЅРµРїРѕСЂРѕР¶РЅС–Рј РјР°СЃРёРІРѕРј",
+      throw new AppError(
+        400,
+        "candidateGroupCounts має бути непорожнім масивом",
       );
     }
 
@@ -688,22 +692,27 @@ class AnalyticsService {
       ),
     ];
     if (candidateCounts.length > 20) {
-      throw new Error("Можна передати не більше 20 варіантів груп");
+      throw new AppError(400, "Можна передати не більше 20 варіантів груп");
     }
 
     if (uniqueCounts.length !== candidateCounts.length) {
-      throw new Error("candidateGroupCounts не може містити повторення");
+      throw new AppError(
+        400,
+        "candidateGroupCounts не може містити повторення",
+      );
     }
 
     for (const count of uniqueCounts) {
       if (count > requestedCount) {
-        throw new Error(
+        throw new AppError(
+          400,
           `Кількість груп (${count}) не може перевищувати кількість дітей (${requestedCount})`,
         );
       }
 
       if (requestedCount > count * 20) {
-        throw new Error(
+        throw new AppError(
+          400,
           `Для ${requestedCount} дітей недостатньо ${count} груп (максимум 20 дітей у групі)`,
         );
       }
@@ -742,13 +751,16 @@ class AnalyticsService {
             Number(value) > 20,
         )
       ) {
-        throw new Error(`Некоректний розподіл дітей для ${count} груп`);
+        throw new AppError(400, `Некоректний розподіл дітей для ${count} груп`);
       }
 
       const counts = distribution.map(Number);
 
       if (counts.reduce((sum, value) => sum + value, 0) !== requestedCount) {
-        throw new Error("Сума дітей у групах має дорівнювати childrenCount");
+        throw new AppError(
+          400,
+          "Сума дітей у групах має дорівнювати childrenCount",
+        );
       }
       const salaryExpense = counts.reduce((total, childrenCount) => {
         const educatorSalary = calculateSalary("EDUCATOR", childrenCount);
@@ -832,7 +844,7 @@ class AnalyticsService {
         },
       })),
       assumptions: {
-        mealDaysPerMonth: 21,
+        mealDaysPerMonth: MEAL_DAYS_PER_MONTH,
         hypotheticalChildrenMealRate: "average of registered children",
         hypotheticalChildrenDiscount: newChildrenDiscount.toFixed(2),
         scheduleFeasibilityProvided: candidates.every(
@@ -894,16 +906,16 @@ class AnalyticsService {
 
       if (N === 0) {
         status = "UNDERLOADED";
-        advice = "Р“СЂСѓРїР° РїРѕСЂРѕР¶РЅСЏ.";
+        advice = "Група порожня.";
       } else if (N < 12) {
         status = "UNDERLOADED";
-        advice = `РЈ РіСЂСѓРїС– ${N} РґС–С‚РµР№.`;
+        advice = `У групі ${N} дітей.`;
       } else if (N === 12) {
         status = "OPTIMAL";
-        advice = "РћРїС‚РёРјР°Р»СЊРЅРµ Р·Р°РїРѕРІРЅРµРЅРЅСЏ.";
+        advice = "Оптимальне заповнення.";
       } else {
         status = "HIGH_LOAD";
-        advice = `РЈ РіСЂСѓРїС– ${N} РґС–С‚РµР№.`;
+        advice = `У групі ${N} дітей.`;
       }
 
       return {

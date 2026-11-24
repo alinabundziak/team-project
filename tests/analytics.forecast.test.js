@@ -132,7 +132,10 @@ test("Відсутній тариф викликає помилку", async () =
 test("Некоректний формат місяця викликає помилку", async () => {
   const analytics = createAnalytics();
 
-  await assert.rejects(analytics.getRevenueForecast("2026-13"), /YYYY-MM/);
+  await assert.rejects(analytics.getRevenueForecast("2026-13"), {
+    status: 400,
+    message: /YYYY-MM/,
+  });
 });
 
 test("Відсутній тариф харчування викликає помилку", async () => {
@@ -400,7 +403,10 @@ test("Сценарій відхиляє знижку понад 30%", async () =
       discountChangePercent: 35,
       feasibilityByGroupCount: { 1: true },
     }),
-    /знижк/i,
+    {
+      status: 400,
+      message: /знижк/i,
+    },
   );
 });
 
@@ -421,7 +427,10 @@ test("Сценарій не дозволяє понад 20 дітей в одн�
       candidateGroupCounts: [1],
       feasibilityByGroupCount: { 1: true },
     }),
-    /20/,
+    {
+      status: 400,
+      message: /20/,
+    },
   );
 });
 
@@ -505,7 +514,10 @@ test("Сценарій відхиляє ручний розподіл із не�
       },
       feasibilityByGroupCount: { 3: true },
     }),
-    /Сума дітей у групах має дорівнювати childrenCount/,
+    {
+      status: 400,
+      message: /Сума дітей у групах має дорівнювати childrenCount/,
+    },
   );
 });
 
@@ -525,6 +537,39 @@ test("Сценарій не дозволяє понад 20 варіантів к
       childrenCount: 21,
       candidateGroupCounts: Array.from({ length: 21 }, (_, index) => index + 1),
     }),
-    /не більше 20 варіантів груп/,
+    {
+      status: 400,
+      message: /не більше 20 варіантів груп/,
+    },
+  );
+});
+
+test("Сценарій відхиляє некоректний відсоток зміни тарифу", async () => {
+  const analytics = createAnalytics();
+
+  await assert.rejects(
+    analytics.calculateScenario({
+      period: "2026-12",
+      tariffPriceChangePercent: "abc",
+    }),
+    {
+      status: 400,
+      message: /Відсотки змін мають бути числами/,
+    },
+  );
+});
+
+test("Сценарій відхиляє некоректний відсоток зміни знижки", async () => {
+  const analytics = createAnalytics();
+
+  await assert.rejects(
+    analytics.calculateScenario({
+      period: "2026-12",
+      discountChangePercent: "abc",
+    }),
+    {
+      status: 400,
+      message: /Відсотки змін мають бути числами/,
+    },
   );
 });
