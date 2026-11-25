@@ -1,0 +1,12 @@
+$kind: http-request
+name: "08 Login: порожнє тіло"
+url: "{{baseUrl}}/auth/login"
+method: POST
+body:
+  type: json
+  content: "{}"
+scripts:
+  - type: afterResponse
+    code: pm.test('400', () => pm.response.to.have.status(400));
+    language: text/javascript
+order: 8000

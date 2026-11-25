@@ -1,0 +1,11 @@
+$kind: http-request
+url: http://localhost:3000/api/audit-logs?from=2026-01-01&to=2026-12-31
+method: GET
+queryParams:
+  from: 2026-01-01
+  to: 2026-12-31
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 4000

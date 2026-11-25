@@ -1,4 +1,5 @@
-const analyticsService = require('./analytics.service');
+
+const analyticsService = require("./analytics.service");
 
 exports.getFinancialSummary = async (req, res, next) => {
   try {
@@ -19,14 +20,18 @@ exports.getDebts = async (req, res, next) => {
   }
 };
 
+
 exports.getRevenueForecast = async (req, res, next) => {
   try {
-    const forecast = await analyticsService.getRevenueForecast();
+    const forecast = await analyticsService.getRevenueForecast(
+      req.forecastPeriod
+    );
     res.json(forecast);
   } catch (error) {
     next(error);
   }
 };
+
 
 exports.runScenario = async (req, res, next) => {
   try {

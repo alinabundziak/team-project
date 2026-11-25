@@ -1,0 +1,10 @@
+$kind: http-request
+url: http://localhost:3000/api/audit-logs?operation=INSERT
+method: GET
+queryParams:
+  operation: INSERT
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 3000

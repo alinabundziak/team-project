@@ -1,0 +1,10 @@
+$kind: http-request
+url: http://localhost:3000/api/audit-logs?tableName=public.children
+method: GET
+queryParams:
+  tableName: public.children
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 2000

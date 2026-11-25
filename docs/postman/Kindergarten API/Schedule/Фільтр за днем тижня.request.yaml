@@ -1,0 +1,10 @@
+$kind: http-request
+url: http://localhost:3000/api/schedules?day_of_week=1
+method: GET
+queryParams:
+  day_of_week: "1"
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 2000

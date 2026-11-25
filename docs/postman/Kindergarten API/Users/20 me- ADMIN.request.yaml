@@ -1,0 +1,9 @@
+$kind: http-request
+name: "20 me: ADMIN"
+url: "{{baseUrl}}/users/me"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 1000

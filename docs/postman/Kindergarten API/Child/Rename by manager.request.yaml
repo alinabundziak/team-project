@@ -1,0 +1,11 @@
+$kind: http-request
+url: http://localhost:3000/api/children/{{childId}}
+method: PATCH
+body:
+  type: json
+  content: '{"firstName":"Софія"}'
+auth:
+  type: bearer
+  credentials:
+    token: "{{managerToken}}"
+order: 4000
