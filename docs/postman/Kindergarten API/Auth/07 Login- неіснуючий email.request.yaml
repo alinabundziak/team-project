@@ -1,0 +1,18 @@
+$kind: http-request
+name: "07 Login: неіснуючий email"
+url: "{{baseUrl}}/auth/login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"email\":\"nobody@example.com\",\r
+
+    \    \"password\":\"Test12345!\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: pm.test('401', () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 7000

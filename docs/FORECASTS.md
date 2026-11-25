@@ -11,7 +11,7 @@ The API supports:
 - Checking schedule feasibility for each scenario.
 - Recommending the most profitable feasible scenario.
 
-All forecast and scenario endpoints are available only to users with the `ADMIN` role.
+All analytics endpoints described in this document require authentication and the `ADMIN` role.
 
 Base path: `/api/analytics`
 
@@ -19,7 +19,7 @@ Base path: `/api/analytics`
 
 | Method | Endpoint | Description | Access |
 |---|---|---|---|
-| GET | `/api/analytics/revenue-forecast` | Returns the revenue forecast for a month | ADMIN |
+| GET | `/api/analytics/revenue-forecast` | Returns the revenue forecast | ADMIN |
 | POST | `/api/analytics/scenarios` | Compares financial scenarios and checks schedule feasibility | ADMIN |
 | POST | `/api/schedules/generate-draft` | Generates or rechecks a draft schedule independently | ADMIN, MANAGER |
 
@@ -34,37 +34,30 @@ The existing endpoints must be extended rather than duplicated.
 The `period` query parameter is optional.
 
 - If omitted, the API uses the current month.
-- If provided, it must match the `YYYY-MM` format and represent a valid calendar month.
+- If provided, it must match the `YYYY-MM` format.
 - Invalid values return HTTP 400.
 
 ### Response
 
-The response contains:
+The forecast contains:
 
 | Field | Description |
 |---|---|
-| `period` | Requested forecast month |
-| `registeredChildrenCount` | Number of registered children included in the forecast |
+| `activeChildrenCount` | Number of children included in the forecast |
 | `expectedTuitionRevenue` | Expected tuition revenue |
 | `expectedMealsRevenue` | Expected meal revenue |
 | `expectedTotalRevenue` | Total expected revenue |
 
 Monetary values are returned as JSON numbers.
 
-### Example
-
-Request:
-
-`GET /api/analytics/revenue-forecast?period=2026-11`
-
-Example response:
+Example:
 
 ```json
 {
   "activeChildrenCount": 24,
-  "expectedTuitionRevenue": 324000.00,
-  "expectedMealsRevenue": 252000.00,
-  "expectedTotalRevenue": 576000.00
+  "expectedTuitionRevenue": 324000,
+  "expectedMealsRevenue": 252000,
+  "expectedTotalRevenue": 576000
 }
 ```
 
@@ -76,84 +69,169 @@ The values above are illustrative and do not represent actual database results.
 
 `POST /api/analytics/scenarios`
 
-The endpoint accepts one comparison request and returns multiple group-count variants.
+The endpoint accepts one comparison request and evaluates several possible group-count variants.
 
-Example request:
+Example:
 
 ```json
 {
-  "scenarioId": "550e8400-e29b-41d4-a716-446655440000",
+  "scenarioId": "scenario-2026-11-a",
   "period": "2026-11",
-  "targetGroupsCount": 3,
-  "targetChildrenPerGroup": 12,
-  "tariffPriceChangePercent": 0,
-  "discountChangePercent": 0
+  "childrenCount": 36,
+  "candidateGroupCounts": [2, 3, 4],
+  "tariffPriceChangePercent": 5,
+  "discountChangePercent": 0,
+  "paymentPlan": "MONTHLY"
 }
 ```
 
-Parameters:
+### Request parameters
 
 | Parameter | Required | Description |
 |---|---|---|
-| `period` | No | Forecast month in `YYYY-MM` format; defaults to the current month |
-| `targetGroupsCount` | Yes for an explicit comparison | Requested number of groups |
-| `targetChildrenPerGroup` | No | Target number of children per group; when provided, must be a positive integer |
-| `tariffPriceChangePercent` | No | Simulated percentage change in tuition price |
-| `discountChangePercent` | No | Simulated percentage change in the discount |
+| `scenarioId` | Yes | Non-empty client-provided string identifying the comparison request. It does not have to be a UUID. Maximum length: 128 characters. |
+| `period` | Yes | Forecast month in `YYYY-MM` format. |
+| `childrenCount` | Yes | Positive integer representing the number of children in the scenario. |
+| `candidateGroupCounts` | Yes | Array of unique candidate group counts. |
+| `tariffPriceChangePercent` | No | Simulated tuition tariff change, from -100 to 100. Defaults to 0. |
+| `discountChangePercent` | No | Change in discount, expressed in percentage points. Defaults to 0. |
+| `paymentPlan` | No | `MONTHLY` or `ANNUAL`. Defaults to `MONTHLY`. |
+| `manualGroupDistributions` | No | Explicit distribution of children between groups. |
+| `weeklySchedule` | No | Proposed weekly schedule used for feasibility checking. |
+| `includedChildIds` | No | Unique IDs of active children included in the scenario. |
 
-Validation requirements:
+### Candidate group counts
 
-- `period` must be a valid calendar month in `YYYY-MM` format.
-- `scenarioId` is required and must be a UUID v4.
-- `targetGroupsCount` must be an integer from 1 to 20.
-- Each group must contain no more than 20 children.
-- `targetChildrenPerGroup`, when provided, must be a positive integer not exceeding 20.
-- Percentage values must be finite numbers and must satisfy the approved validation rules.
-- The same `scenarioId` identifies all variants within one comparison request.
+- `candidateGroupCounts` must contain between 1 and 20 variants.
+- Every group count must be a positive integer.
+- Group counts must be unique.
+- A group count cannot exceed `childrenCount`.
+- No group may contain more than 20 children.
+- If no manual distribution is supplied, children are distributed as evenly as possible between groups.
 
-The validation limits documented above represent the approved API requirements for version 1.
+### Manual group distribution
 
-### Scenario response
+Example:
 
-Each comparison response contains:
+```json
+{
+  "manualGroupDistributions": {
+    "groupCount": 2,
+    "groups": [
+      {
+        "scenarioGroupKey": "group-a",
+        "childIds": ["1", "2", "3"],
+        "additionalChildrenCount": 1
+      },
+      {
+        "scenarioGroupKey": "group-b",
+        "childIds": ["4", "5", "6"]
+      }
+    ]
+  }
+}
+```
 
-- A shared `scenarioId` identifying the comparison request.
-- A list of variants.
-- A unique variant identifier for each variant.
-- Financial results for each variant.
-- Schedule feasibility information.
-- A recommended variant, when at least one feasible variant exists.
+Rules:
 
-Each variant should include:
+- `groupCount` must be an integer from 1 to 20.
+- The number of elements in `groups` must equal `groupCount`.
+- Every group must have a unique, non-empty `scenarioGroupKey`.
+- `childIds` must contain unique, non-empty strings.
+- `additionalChildrenCount` is optional and defaults to 0.
+- The total number of children, including additional children, must equal `childrenCount`.
+- A group cannot contain more than 20 children.
+
+### Weekly schedule
+
+Each proposed lesson must contain:
+
+- `scenarioGroupKey` — the key of the group from the manual distribution.
+- `activityId` — activity identifier.
+- `teacherId` — teacher identifier.
+- `roomId` — room identifier.
+- `day_of_week` — integer from 1 to 7.
+- `duration` — positive integer.
+
+The schedule is used for feasibility checking. The scenario API must use the existing schedule service rather than implementing a separate scheduling algorithm.
+
+### Included children
+
+When `includedChildIds` is supplied:
+
+- It must contain unique, non-empty IDs.
+- The number of IDs must equal `childrenCount`.
+- Only active children may be included.
+
+### Percentage validation
+
+`tariffPriceChangePercent`:
+
+- Must be a finite number.
+- Allowed range: -100 to 100.
+- Defaults to 0.
+
+`discountChangePercent`:
+
+- Must be a finite number.
+- Is expressed in percentage points.
+- The resulting personal discount must be between 0% and 30%.
+- The discount must not be silently clamped to the allowed range.
+- If the resulting discount is invalid for one variant, that variant must be rejected while other variants continue to be evaluated.
+- A non-numeric or infinite global parameter rejects the entire request.
+
+### Payment plan
+
+Supported values:
+
+- `MONTHLY` — monthly tuition calculation.
+- `ANNUAL` — annual tuition calculation.
+
+For annual payment:
+
+- Apply the 12% annual payment discount after the personal discount.
+- The 12% annual discount is not included in the 30% personal discount limit.
+- Monthly forecast values are calculated as the annual amount divided by 12.
+
+## 5. Scenario Response
+
+The response contains:
+
+- `scenarioId` — the client-provided comparison identifier.
+- `variants` — evaluated scenario variants.
+- `recommendedVariantId` — the ID of the recommended variant, or `null`.
+
+Each variant contains:
 
 | Field | Description |
 |---|---|
-| `variantId` | Unique identifier of the variant |
-| `groupsCount` | Number of groups |
-| `childrenCount` | Total simulated children |
-| `revenue` | Expected revenue |
-| `expenses` | Expected expenses |
-| `profit` | Expected financial result |
-| `feasibility` | Schedule feasibility result |
+| `variantId` | Unique server-generated identifier of the variant |
+| `groupCount` | Number of groups |
+| `groupDistribution` | Distribution of children between groups |
+| `revenue.tuition` | Tuition revenue |
+| `revenue.meals` | Meal revenue |
+| `expenses.payroll` | Payroll expenses |
+| `expenses.rent` | Rent expenses |
+| `expenses.meals` | Meal expenses |
+| `accrualProfit` | Revenue minus expenses |
+| `schedule.feasible` | Whether the proposed schedule is feasible |
+| `schedule.draft` | Generated draft schedule |
+| `schedule.unassigned` | Lessons that could not be assigned |
 
-Monetary values must be returned as JSON numbers.
+Meal revenue must equal meal expenses.
 
-Each variant must also include its schedule feasibility status (`isFeasible`).
-
-The response must contain the shared `scenarioId`, all evaluated variants and `recommendedVariantId`.
+Monetary values are returned as JSON numbers.
 
 ### Recommendation rules
 
-1. Only feasible variants are considered for recommendation.
-2. If at least one feasible variant has a positive profit, recommend the feasible variant with the highest profit.
-3. If all feasible variants are loss-making or break even, recommend the feasible variant with the smallest loss (or highest profit).
-4. If no variant is feasible, return no recommendation and include feasibility information for each variant.
+1. Only feasible variants are considered.
+2. If feasible variants have positive profit, recommend the one with the highest profit.
+3. If all feasible variants are loss-making, recommend the variant with the smallest loss.
+4. If no variant is feasible, return `recommendedVariantId: null`.
 
-The API must use the existing schedule service to check each variant. It must not duplicate the schedule generator's business logic.
+Scenario calculations must not create persistent scenario records in the database.
 
-Scenario calculations are performed without creating persistent scenario records in the database.
-
-## 5. Schedule Draft Generation
+## 6. Schedule Draft Generation
 
 ### Request
 
@@ -161,9 +239,9 @@ Scenario calculations are performed without creating persistent scenario records
 
 Access: `ADMIN`, `MANAGER`.
 
-This endpoint remains available for standalone schedule generation and for rechecking a manually modified scenario variant.
+This endpoint remains available for standalone draft generation and manual schedule recalculation.
 
-The existing request structure includes:
+Example:
 
 ```json
 {
@@ -187,31 +265,28 @@ Validation requirements:
 - Each item must contain valid identifiers and a positive integer duration.
 - Invalid input returns HTTP 400.
 
-The route must pass the requested group composition to the existing draft-generation service when used for scenario feasibility checks.
+The route must use the existing schedule service. It must not implement a second schedule-generation algorithm.
 
-The route must not implement a second schedule-generation algorithm.
-
-## 6. Financial Calculation Assumptions
+## 7. Financial Calculation Assumptions
 
 Financial calculations must follow the financial rules documented in `docs/FINANCE.md`.
 
 Main assumptions:
 
-- Monthly tuition is based on the active `TUITION_MONTHLY` tariff.
-- Child discounts are applied to tuition.
+- Monthly tuition is based on the applicable `TUITION_MONTHLY` tariff.
+- Personal discounts are applied to tuition.
 - Meal revenue is calculated using the applicable meal rate for the child's age.
-- The standard meal period is 21 working days per month (`MEAL_DAYS_PER_MONTH = 21`).
+- The standard meal period is 21 working days per month.
 - Meal discounts are not applied.
 - Group expenses include staff salaries and rent.
 - Administrative fixed salaries are included in scenario calculations.
+- Annual payment receives an additional 12% discount after the personal discount.
 
-The API must not silently substitute a hardcoded tuition tariff when the applicable tariff is missing.
+Fallback assumptions must be explicitly documented in the implementation and API response where applicable. This includes missing tariff data, missing meal-rate data, missing age information, empty database results, and assumed additional children.
 
-If the required tariff is unavailable, return a controlled error without exposing database details.
+The API must not silently substitute arbitrary financial values when required data is missing. Any permitted fallback must be visible and clearly identified.
 
-Meal rates must follow the configured rates and the financial rules in `docs/FINANCE.md`.
-
-## 7. Access Control
+## 8. Access Control
 
 | Endpoint | ADMIN | MANAGER | TEACHER | PARENT |
 |---|---|---|---|---|
@@ -225,7 +300,7 @@ Unauthorized requests return HTTP 401. Authenticated users without the required 
 
 Access permissions must be enforced on the server.
 
-## 8. Error Handling
+## 9. Error Handling
 
 Validation errors return HTTP 400.
 
@@ -240,7 +315,7 @@ Responses must not expose:
 - Internal database structure.
 - Sensitive implementation details.
 
-The standard error response format is:
+Standard error format:
 
 ```json
 {
@@ -251,17 +326,24 @@ The standard error response format is:
 }
 ```
 
-## 9. Version 1 Limitations
+## 10. Implementation Status and Integration Dependencies
 
-- Forecasts are estimates based on the available financial and child data.
-- Scenario comparisons do not create persistent scenario records.
-- Schedule feasibility depends on the existing schedule service and its current validation rules.
-- Scenario parameter limits must be confirmed by the Team Lead.
-- The API does not replace the financial operations API or the schedule management API.
-- Financial formulas and schedule-generation logic remain in their respective services.
+The API route contains validation for the new scenario request structure.
 
-## 10. Related Documentation
+The scenario calculation service must also implement the new contract. The legacy calculation based on `targetGroupsCount` and `targetChildrenPerGroup` is not compatible with the request and response structure described in this document.
+
+Integration depends on:
+
+- Dev 1: financial and payroll calculation logic.
+- Dev 3: weekly schedule generation and feasibility checking.
+- Dev 4: API validation, request orchestration, response structure, access control, documentation and tests.
+- Team Lead: approval of the shared integration contract.
+
+Do not treat the new scenario API as fully integrated until the service implementation and integration tests match this document.
+
+## 11. Related Documentation
 
 - `docs/FINANCE.md` — financial operations, tariffs, discounts and calculation rules.
-- `tests/test-cases.md` — forecast and audit test cases.
-- `tests/forecast-api.test.js` — automated API tests for forecast and scenario endpoint validation.
+- `tests/test-cases.md` — API, forecast, scenario and audit test cases.
+- `tests/forecast-api.test.js` — automated validation and access-control tests.
+- `tests/schedule-draft-api.test.js` — schedule draft validation and access tests.

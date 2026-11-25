@@ -1,0 +1,10 @@
+$kind: collection
+description: ""
+variables:
+  adminToken: ""
+  managerToken: ""
+  teacherToken: ""
+  parent1Token: ""
+  parent2Token: ""
+  birth3: ""
+  birthTooOld: ""

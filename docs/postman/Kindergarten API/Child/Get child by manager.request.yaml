@@ -1,0 +1,17 @@
+$kind: http-request
+url: http://localhost:3000/api/children?search=Марта
+method: GET
+queryParams:
+  - key: search
+    value: Марта
+    disabled: false
+    description: ""
+  - key: groupId
+    value: "1"
+    disabled: true
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{managerToken}}"
+order: 2000

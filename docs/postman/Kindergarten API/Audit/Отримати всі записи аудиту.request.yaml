@@ -1,0 +1,8 @@
+$kind: http-request
+url: http://localhost:3000/api/audit-logs
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 1000

@@ -1,0 +1,35 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"email\": \"parent1.test@example.com\",\r
+
+    \  \"password\": \"Test12345!\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "pm.test('Статус 200', () => pm.response.to.have.status(200));\r
+
+      \r
+
+      const body = pm.response.json();\r
+
+      \r
+
+      pm.test('Є token', () => pm.expect(body.token).to.be.a('string'));\r
+
+      pm.test('Хеш пароля не віддається', () => {\r
+
+      \  pm.expect(JSON.stringify(body)).to.not.include('password');\r
+
+      });\r
+
+      \r
+
+      pm.collectionVariables.set('parent1Token', body.token);"
+    language: text/javascript
+order: 4000

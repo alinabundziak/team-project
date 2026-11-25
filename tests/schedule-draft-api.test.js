@@ -5,8 +5,10 @@ const express = require("express");
 const request = require("supertest");
 const proxyquire = require("proxyquire").noCallThru();
 
+
 function createApp() {
   let receivedData = null;
+  const scheduleQueries = [];
 
   const authModule = {
     authenticate(req, res, next) {
@@ -18,6 +20,8 @@ function createApp() {
         req.user = { id: 2, role: "MANAGER" };
       } else if (token === "Bearer teacher") {
         req.user = { id: 3, role: "TEACHER" };
+      } else if (token === "Bearer parent") {
+        req.user = { id: 4, role: "PARENT" };
       }
 
       next();
@@ -62,8 +66,35 @@ function createApp() {
     },
   };
 
+  const prismaMock = {
+    schedules: {
+      async findMany(options) {
+        scheduleQueries.push(options);
+        return [];
+      },
+    },
+
+    parents: {
+      async findUnique() {
+        return {
+          child_parents: [
+            { child: { group_id: 10 } },
+            { child: { group_id: 11 } },
+            { child: { group_id: null } },
+          ],
+        };
+      },
+    },
+
+    employees: {
+      async findUnique() {
+        return { id: 3 };
+      },
+    },
+  };
+
   const scheduleRouter = proxyquire("../src/routes/schedule.router.js", {
-    "../config/prisma": {},
+    "../config/prisma": prismaMock,
     "../services/schedule.service": scheduleService,
     "../middleware/authenticate": authModule,
   });
@@ -80,8 +111,10 @@ function createApp() {
     app,
     getReceivedData: () => receivedData,
     wasServiceCalled: () => receivedData !== null,
+    getScheduleQueries: () => scheduleQueries,
   };
 }
+
 
 const validItem = {
   group_id: 1,
@@ -376,4 +409,164 @@ test("сервіс отримує всі дані запиту без змін",
 
   assert.equal(response.status, 200);
   assert.deepEqual(getReceivedData(), requestBody);
+});
+
+
+// ==================== GET /schedules FILTERS ====================
+
+async function sendSchedulesRequest(token, query = {}) {
+  const { app, getScheduleQueries } = createApp();
+
+  const response = await request(app)
+    .get("/api/schedules")
+    .set("Authorization", `Bearer ${token}`)
+    .query(query);
+
+  return {
+    response,
+    queries: getScheduleQueries(),
+  };
+}
+
+// Перевірка кожного фільтра окремо.
+
+for (const [field, value] of [
+  ["day_of_week", "1"],
+  ["group_id", "10"],
+  ["teacher_id", "3"],
+  ["room_id", "2"],
+  ["activity_id", "4"],
+]) {
+  test(`ADMIN може фільтрувати розклад за ${field}`, async () => {
+    const { response, queries } = await sendSchedulesRequest(
+      "admin",
+      { [field]: value }
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(queries.length, 1);
+    assert.equal(queries[0].where[field], Number(value));
+  });
+}
+
+// Комбінація фільтрів.
+
+test("ADMIN може одночасно застосувати декілька фільтрів", async () => {
+  const filters = {
+    day_of_week: "2",
+    group_id: "10",
+    teacher_id: "3",
+    room_id: "4",
+    activity_id: "5",
+  };
+
+  const { response, queries } = await sendSchedulesRequest(
+    "admin",
+    filters
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where, {
+    day_of_week: 2,
+    group_id: 10,
+    teacher_id: 3,
+    room_id: 4,
+    activity_id: 5,
+  });
+});
+
+// Некоректні значення фільтрів.
+
+for (const [field, value] of [
+  ["day_of_week", "0"],
+  ["day_of_week", "8"],
+  ["day_of_week", "1.5"],
+  ["day_of_week", "abc"],
+  ["group_id", "0"],
+  ["group_id", "-1"],
+  ["group_id", "abc"],
+  ["teacher_id", "1.5"],
+  ["room_id", "0"],
+  ["activity_id", "abc"],
+]) {
+  test(`некоректний фільтр ${field}=${value} повертає 400`, async () => {
+    const { response, queries } = await sendSchedulesRequest(
+      "admin",
+      { [field]: value }
+    );
+
+    assert.equal(response.status, 400);
+    assert.equal(queries.length, 0);
+  });
+}
+
+// Доступ ADMIN та MANAGER.
+
+test("ADMIN може переглядати розклад без фільтрів", async () => {
+  const { response, queries } = await sendSchedulesRequest("admin");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where, {});
+});
+
+test("MANAGER може переглядати розклад із фільтрами", async () => {
+  const { response, queries } = await sendSchedulesRequest(
+    "manager",
+    { day_of_week: "3", group_id: "10" }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where, {
+    day_of_week: 3,
+    group_id: 10,
+  });
+});
+
+// Обмеження доступу PARENT.
+
+test("PARENT бачить розклад тільки груп своїх дітей", async () => {
+  const { response, queries } = await sendSchedulesRequest("parent");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where.group_id, {
+    in: [10, 11],
+  });
+});
+
+test("PARENT може застосувати додатковий фільтр до своїх груп", async () => {
+  const { response, queries } = await sendSchedulesRequest(
+    "parent",
+    { group_id: "10", day_of_week: "2" }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where, {
+    group_id: {
+      in: [10, 11],
+      equals: 10,
+    },
+    day_of_week: 2,
+  });
+});
+
+// Обмеження доступу TEACHER.
+
+test("TEACHER бачить тільки власні заняття", async () => {
+  const { response, queries } = await sendSchedulesRequest("teacher");
+
+  assert.equal(response.status, 200);
+  assert.equal(queries[0].where.teacher_id, 3);
+});
+
+test("TEACHER не може переглядати заняття іншого викладача через фільтр", async () => {
+  const { response, queries } = await sendSchedulesRequest(
+    "teacher",
+    { teacher_id: "99", group_id: "10" }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(queries[0].where, {
+    teacher_id: 3,
+    group_id: 10,
+  });
 });

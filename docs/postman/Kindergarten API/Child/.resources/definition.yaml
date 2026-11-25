@@ -1,0 +1,18 @@
+$kind: collection
+scripts:
+  - type: http:beforeRequest
+    code: "const d = new Date();\r
+
+      const iso = (years) =>\r
+
+      \  new Date(Date.UTC(d.getFullYear() - years, d.getMonth(), d.getDate()))\r
+
+      \    .toISOString().slice(0, 10);\r
+
+      \r
+
+      pm.collectionVariables.set('birth3', iso(3));     // валідно\r
+
+      pm.collectionVariables.set('birthTooOld', iso(6)); // має дати 400"
+    language: text/javascript
+order: 4000

@@ -1,0 +1,18 @@
+$kind: http-request
+name: "06 Login: неправильний пароль"
+url: "{{baseUrl}}/auth/login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"email\":\"admin.test@example.com\",\r
+
+    \    \"password\":\"wrong\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: pm.test('401', () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 6000

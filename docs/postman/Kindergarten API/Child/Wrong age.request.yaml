@@ -1,0 +1,11 @@
+$kind: http-request
+url: http://localhost:3000/api/children
+method: POST
+body:
+  type: json
+  content: '{"firstName":"Тест","lastName":"Тестенко","dateOfBirth":"{{birthTooOld}}"}'
+auth:
+  type: bearer
+  credentials:
+    token: "{{adminToken}}"
+order: 8000

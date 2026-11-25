@@ -1,0 +1,8 @@
+$kind: http-request
+url: http://localhost:3000/api/children
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{parent1Token}}"
+order: 6000
